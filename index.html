@@ -944,12 +944,20 @@ function render(orders) {
   renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total);
 }
 
-// ── Status Chart ────────────────────────────────────────────────────
+// ── Chart Utilities ─────────────────────────────────────────────────
 function mkChart(id,type,data,opts) {
   if (charts[id]) charts[id].destroy();
   charts[id] = new Chart(document.getElementById(id),{
     type,data,options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},...opts}
   });
+}
+// Dynamic Y-axis range for delivery % — zooms to actual data variation ±10
+function dynPctAxis(pcts) {
+  const vals = pcts.map(Number).filter(v => !isNaN(v) && v > 0);
+  if (!vals.length) return {min:0, max:100};
+  const lo = Math.max(0,  Math.floor(Math.min(...vals) - 10));
+  const hi = Math.min(100, Math.ceil(Math.max(...vals) + 10));
+  return {min: lo, max: hi};
 }
 function sColor(s) {
   if (s==='DELIVERED')            return '#2E7D32';
@@ -963,31 +971,79 @@ function sColor(s) {
   if (s==='OUT FOR DELIVERY')    return '#0277BD';
   return '#BDBDBD';
 }
+
+// ── Status Chart ────────────────────────────────────────────────────
 function renderStatusChart(sc) {
-  const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const sorted = Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  const tot    = sorted.reduce((s,[,v])=>s+v, 0);
+  // Labels include count + % so they're visible in legend at all times
+  const labels = sorted.map(([s,v]) => `${s}  ${v} (${tot?(v/tot*100).toFixed(1):0}%)`);
   mkChart('cStatus','doughnut',{
-    labels:sorted.map(([s])=>s),
+    labels,
     datasets:[{data:sorted.map(([,v])=>v),backgroundColor:sorted.map(([s])=>sColor(s)),borderWidth:2.5,borderColor:'#fff'}]
-  },{cutout:'52%',plugins:{legend:{position:'right',labels:{font:{size:10.5},boxWidth:11,padding:8}}}});
+  },{
+    cutout:'52%',
+    plugins:{
+      legend:{position:'right',labels:{font:{size:10.5},boxWidth:11,padding:6}},
+      tooltip:{callbacks:{label:ctx=>{
+        const v=ctx.parsed; const pct=tot?(v/tot*100).toFixed(1):0;
+        return ` ${v.toLocaleString()} orders · ${pct}%`;
+      }}}
+    }
+  });
 }
 
-// ── Trend Chart (smooth line) ────────────────────────────────────────
+// ── Trend Chart (smooth line + delivery % yellow line) ───────────────
 function renderTrendChart(orders) {
   const by={};
-  orders.forEach(o=>{const d=parseDate(o[C.CREATED]);if(d){const k=ymd(d);by[k]=(by[k]||0)+1;}});
-  const days=Object.keys(by).sort();
-  mkChart('cTrend','line',{
+  orders.forEach(o=>{
+    const d=parseDate(o[C.CREATED]); if(!d) return;
+    const k=ymd(d);
+    if(!by[k]) by[k]={total:0,del:0,newOrd:0};
+    by[k].total++;
+    if((o[C.STATUS]||'').trim()==='DELIVERED') by[k].del++;
+    if((o[C.STATUS]||'').trim()==='NEW ORDER')  by[k].newOrd++;
+  });
+  const days    = Object.keys(by).sort();
+  const counts  = days.map(d=>by[d].total);
+  const delPcts = days.map(d=>{
+    const {total,del,newOrd}=by[d];
+    const shipped=total-newOrd;
+    return shipped>0 ? parseFloat((del/shipped*100).toFixed(1)) : null;
+  });
+  const {min:pMin,max:pMax} = dynPctAxis(delPcts.filter(v=>v!=null));
+
+  mkChart('cTrend','bar',{
     labels:days,
-    datasets:[{
-      label:'Orders',data:days.map(d=>by[d]),
-      borderColor:VAR_PURPLE,backgroundColor:'rgba(97,62,152,.12)',
-      borderWidth:2.5,tension:0.4,fill:true,
-      pointBackgroundColor:VAR_PURPLE,pointRadius:3,pointHoverRadius:5
-    }]
-  },{plugins:{legend:{display:false}},scales:{
-    x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
-    y:{beginAtZero:true}
-  }});
+    datasets:[
+      {
+        type:'bar',label:'Orders',data:counts,
+        backgroundColor:'rgba(97,62,152,.45)',borderRadius:2,yAxisID:'y'
+      },
+      {
+        type:'line',label:'Delivery %',data:delPcts,
+        borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',
+        borderWidth:2.5,tension:0.4,yAxisID:'y1',
+        pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,
+        spanGaps:true
+      }
+    ]
+  },{
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        return ` Orders: ${ctx.parsed.y}`;
+      }}}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
+      y:{type:'linear',position:'left',beginAtZero:true},
+      y1:{type:'linear',position:'right',min:pMin,max:pMax,
+          grid:{drawOnChartArea:false},
+          ticks:{callback:v=>v+'%'}}
+    }
+  });
 }
 
 // ── State Chart ─────────────────────────────────────────────────────
@@ -1016,18 +1072,25 @@ function renderStateChart(orders) {
     const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
   });
 
+  const {min:sMin,max:sMax} = dynPctAxis(delPcts.map(Number));
   mkChart('cState','bar',{
     labels,
     datasets:[
       {type:'bar',label:'Orders',data:totals,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.15)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6}
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true}
     ]
   },{
-    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        return ` Orders: ${ctx.parsed.y}`;
+      }}}
+    },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:10}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:sMin,max:sMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1057,18 +1120,25 @@ function renderCityTierChart(orders) {
   });
   const colors   = ['rgba(97,62,152,.7)','rgba(97,62,152,.45)','rgba(97,62,152,.25)','rgba(155,127,204,.3)'];
 
+  const {min:tMin,max:tMax} = dynPctAxis(delPcts.map(Number));
   mkChart('cTier','bar',{
     labels,
     datasets:[
       {type:'bar',label:'Orders',data:totals,backgroundColor:colors.slice(0,labels.length),borderRadius:4,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.15)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8}
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8,spanGaps:true}
     ]
   },{
-    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        return ` Orders: ${ctx.parsed.y}`;
+      }}}
+    },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:11}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:tMin,max:tMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1084,6 +1154,8 @@ function buildProductTable(orders) {
     const oid =(r[C.ORDER_ID]||'').trim();
     if(!name||!oid) return;
     if (hideUpsell && isUpsellSKU(sku)) return;
+    // When specific products are selected in filter, only show those in the breakdown table
+    if (selectedProds.size > 0 && !selectedProds.has(name)) return;
     if(!pm[name]) pm[name]={orderIds:new Set(),sku};
     pm[name].orderIds.add(oid);
   });
@@ -1260,6 +1332,8 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
     const bDel     = bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
     return {count:bOrders.length, delPct: bShipped>0?(bDel/bShipped*100).toFixed(1):null};
   });
+  const impactPcts = impactData.map(d=>d.delPct).filter(v=>v!=null);
+  const {min:iMin,max:iMax} = dynPctAxis(impactPcts.map(Number));
   mkChart('cTatImpact','bar',{
     labels:buckets.map(b=>b.label),
     datasets:[
@@ -1267,11 +1341,15 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
       {type:'line',label:'Delivery %',data:impactData.map(d=>d.delPct),borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
     ]
   },{
-    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+    tooltip:{callbacks:{label:ctx=>{
+      if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+      return ` Orders: ${ctx.parsed.y}`;
+    }}}},
     scales:{
       x:{grid:{display:false},ticks:{font:{size:10}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:iMin,max:iMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1357,6 +1435,7 @@ function renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total) {
   });
   const dowTotals = dowData.map(d=>d.total);
   const dowPcts   = dowData.map(d=>{const s=d.total-d.newOrd;return s>0?(d.del/s*100).toFixed(1):0;});
+  const {min:wMin,max:wMax} = dynPctAxis(dowPcts.map(Number));
   mkChart('cWeekday','bar',{
     labels:DOW,
     datasets:[
@@ -1364,11 +1443,15 @@ function renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total) {
       {type:'line',label:'Delivery %',data:dowPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7}
     ]
   },{
-    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+    tooltip:{callbacks:{label:ctx=>{
+      if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+      return ` Orders: ${ctx.parsed.y}`;
+    }}}},
     scales:{
       x:{grid:{display:false},ticks:{font:{size:11}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:wMin,max:wMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
