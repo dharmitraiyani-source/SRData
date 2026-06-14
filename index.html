@@ -1,0 +1,1377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mumma Mall – Delivery Analytics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Reset & Brand Variables (Mumma Mall) ── */
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --purple:#613e98;
+  --purple-d:#3c2b60;
+  --purple-mid:#9b7fcc;
+  --purple-l:#eef1ff;
+  --yellow:#ffcd00;
+  --yellow-d:#c8a200;
+  --bg:#eef1ff;
+  --surface:#ffffff;
+  --border:#d5c5f0;
+  --text:#1a1a2e;
+  --text2:#5a4080;
+  --text3:#9b7fcc;
+  --green:#2E7D32;
+  --orange:#E65100;
+  --red:#B71C1C;
+}
+body{font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
+
+/* ── Header ── */
+.hdr{background:var(--purple-d);color:#fff;padding:0 22px;height:60px;display:flex;align-items:center;justify-content:space-between;box-shadow:0 2px 12px rgba(60,43,96,.45)}
+.hdr-brand{display:flex;align-items:center;gap:12px}
+.hdr-logo{width:40px;height:40px;background:var(--yellow);border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;letter-spacing:-1px;color:var(--purple-d);flex-shrink:0}
+.hdr-text h1{font-size:17px;font-weight:900;color:#fff;letter-spacing:.2px}
+.hdr-text p{font-size:11px;color:var(--purple-mid);margin-top:1px}
+.btn-file{background:rgba(97,62,152,.3);color:#fff;border:1.5px solid var(--purple-mid);padding:6px 14px;border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:background .2s}
+.btn-file:hover{background:rgba(97,62,152,.5)}
+
+/* ── Upload ── */
+#uploadSection{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 60px);padding:40px}
+.upload-box{background:#fff;border:2.5px dashed var(--purple-mid);border-radius:20px;padding:54px 70px;text-align:center;cursor:pointer;transition:all .2s;max-width:460px;width:100%;box-shadow:0 4px 24px rgba(97,62,152,.12)}
+.upload-box:hover,.upload-box.dragover{border-color:var(--purple);background:var(--purple-l)}
+.uicon{font-size:52px;display:block;margin-bottom:14px}
+.upload-box h2{font-size:20px;font-weight:900;margin-bottom:8px;color:var(--purple-d)}
+.upload-box p{font-size:14px;color:var(--text2);line-height:1.5}
+.upload-box small{display:block;margin-top:12px;font-size:12px;color:var(--text3)}
+
+/* ── Dashboard ── */
+#dash{display:none;padding:14px 20px 70px}
+#dash.on{display:block}
+
+/* ── Section Dividers ── */
+.sec-div{margin:32px 0 14px;display:flex;align-items:center;gap:14px}
+.sec-div h2{font-size:17px;font-weight:900;color:var(--purple-d);white-space:nowrap}
+.sd-line{flex:1;height:2px;background:linear-gradient(90deg,var(--purple-mid) 0%,transparent 100%)}
+.sec-tag{background:var(--yellow);color:var(--purple-d);font-size:10px;font-weight:900;padding:2px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.08em;flex-shrink:0}
+
+/* ── Filter Bar ── */
+.fbar{background:#fff;border-radius:12px;padding:12px 16px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:14px;box-shadow:0 1px 8px rgba(97,62,152,.1);border:1px solid var(--border)}
+.fg{display:flex;flex-direction:column;gap:3px}
+.fg label{font-size:9.5px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.08em}
+.fg input{padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;font-size:12.5px;color:var(--text);background:#fff;min-width:105px;font-family:inherit}
+.fg input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(97,62,152,.12)}
+.btn-rst{padding:6px 14px;background:var(--purple-l);border:1.5px solid var(--purple-mid);border-radius:7px;cursor:pointer;font-size:12px;font-weight:700;color:var(--purple);font-family:inherit;transition:background .15s;align-self:flex-end}
+.btn-rst:hover{background:#ddd5f5}
+.rcount{font-size:11.5px;color:var(--text3);align-self:flex-end;margin-left:auto;font-weight:700}
+
+/* ── Upsell Toggle ── */
+.upsell-toggle{display:flex;align-items:center;gap:7px;align-self:flex-end;padding:6px 12px;border-radius:7px;border:1.5px solid var(--border);background:#fff;cursor:pointer;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s;white-space:nowrap;font-family:inherit}
+.upsell-toggle:hover{border-color:var(--purple);color:var(--purple)}
+.upsell-toggle.active{border-color:var(--purple);background:var(--purple-l);color:var(--purple)}
+.toggle-dot{width:28px;height:16px;border-radius:20px;background:#ccc;position:relative;transition:background .2s;flex-shrink:0}
+.upsell-toggle.active .toggle-dot{background:var(--purple)}
+.toggle-dot::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.upsell-toggle.active .toggle-dot::after{left:14px}
+
+/* ── Multi-Select ── */
+.ms-wrap{display:flex;flex-direction:column;gap:3px}
+.ms-wrap label{font-size:9.5px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.08em}
+.ms-trigger{display:flex;align-items:center;gap:8px;padding:6px 10px;border:1.5px solid var(--border);border-radius:7px;background:#fff;cursor:pointer;font-size:12.5px;color:var(--text);min-width:200px;transition:border-color .15s}
+.ms-trigger:hover{border-color:var(--purple)}
+.ms-trigger.has-sel{border-color:var(--purple);background:var(--purple-l)}
+.ms-trigger-txt{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2)}
+.ms-trigger.has-sel .ms-trigger-txt{color:var(--purple);font-weight:700}
+.ms-arrow{font-size:9px;color:var(--text3);flex-shrink:0;display:inline-block;transition:transform .18s}
+.ms-dropdown{display:none;position:fixed;width:75vw;max-height:520px;background:#fff;border:1.5px solid var(--purple-mid);border-radius:12px;box-shadow:0 12px 36px rgba(0,0,0,.18);z-index:9999;overflow:hidden;flex-direction:column}
+.ms-dropdown.open{display:flex}
+.ms-search-row{padding:10px 12px 8px;border-bottom:1px solid var(--purple-l);flex-shrink:0}
+.ms-search-inp{width:100%;padding:7px 10px 7px 32px;border:1.5px solid var(--border);border-radius:7px;font-size:13px;color:var(--text);font-family:inherit;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23613e98' stroke-width='2.5'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.35-4.35'/%3E%3C/svg%3E") no-repeat 10px center}
+.ms-search-inp:focus{outline:none;border-color:var(--purple)}
+.ms-opts{flex:1;overflow-y:auto;padding:8px 10px;display:grid;grid-template-columns:repeat(2,1fr);gap:3px;align-content:start}
+.ms-opt{display:flex;align-items:flex-start;gap:8px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:background .1s}
+.ms-opt:hover{background:var(--purple-l)}
+.ms-opt input[type=checkbox]{accent-color:var(--purple);flex-shrink:0;margin-top:2px;width:14px;height:14px;cursor:pointer}
+.ms-opt-name{font-size:12px;line-height:1.3;color:var(--text);word-break:break-word}
+.ms-opt.hidden{display:none}
+.ms-footer{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--purple-l);flex-shrink:0;background:#faf8ff}
+.ms-footer button{flex:1;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:all .15s}
+.ms-btn-clear{background:#fff;border:1.5px solid var(--border);color:var(--text2)}
+.ms-btn-clear:hover{background:var(--purple-l);border-color:var(--purple-mid)}
+.ms-btn-all{background:var(--purple);border:none;color:#fff}
+.ms-btn-all:hover{background:var(--purple-d)}
+.ms-empty{padding:24px;text-align:center;font-size:13px;color:var(--text3);grid-column:1/-1}
+.ms-opts::-webkit-scrollbar{width:5px}
+.ms-opts::-webkit-scrollbar-thumb{background:var(--purple-mid);border-radius:99px}
+
+/* ── KPI Grid ── */
+.kgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:13px}
+@media(max-width:920px){.kgrid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:500px){.kgrid{grid-template-columns:1fr}}
+.kpi{background:#fff;border-radius:14px;padding:18px 18px 15px;box-shadow:0 2px 10px rgba(97,62,152,.08);border:1px solid var(--border);position:relative;overflow:hidden}
+.kpi::before{content:'';position:absolute;top:0;left:0;right:0;height:4px;border-radius:14px 14px 0 0}
+.k-green::before{background:linear-gradient(90deg,#2E7D32,#43A047)}
+.k-orange::before{background:linear-gradient(90deg,#E65100,#FB8C00)}
+.k-purple::before{background:linear-gradient(90deg,var(--purple),var(--purple-d))}
+.k-yellow::before{background:linear-gradient(90deg,var(--yellow),var(--yellow-d))}
+.k-red::before{background:linear-gradient(90deg,#B71C1C,#E53935)}
+.kpi-ico{font-size:22px;display:block;margin-bottom:8px}
+.kpi-lbl{font-size:9.5px;font-weight:800;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px}
+.kpi-val{font-size:34px;font-weight:900;line-height:1;letter-spacing:-1.5px}
+.k-green .kpi-val{color:#1B5E20}
+.k-orange .kpi-val{color:#BF360C}
+.k-purple .kpi-val{color:var(--purple-d)}
+.k-yellow .kpi-val{color:#7a5e00}
+.k-red .kpi-val{color:#7F0000}
+.kpi-sub{font-size:11px;color:var(--text3);margin-top:5px;line-height:1.3}
+.kpi-note{font-size:9.5px;color:#b0a0d0;margin-top:2px;font-style:italic}
+
+/* ── Sub Metrics ── */
+.sgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+@media(max-width:1100px){.sgrid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:580px){.sgrid{grid-template-columns:repeat(2,1fr)}}
+.sc{background:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 1px 5px rgba(97,62,152,.07);border:1px solid var(--border)}
+.sc .sl{font-size:9.5px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px}
+.sc .sv{font-size:17px;font-weight:800;color:var(--text)}
+
+/* ── Charts ── */
+.cgrid{display:grid;grid-template-columns:1fr 1fr;gap:13px;margin-bottom:13px}
+@media(max-width:800px){.cgrid{grid-template-columns:1fr}}
+.cc{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 2px 8px rgba(97,62,152,.07);border:1px solid var(--border)}
+.cc h3{font-size:12.5px;font-weight:800;color:var(--purple-d);margin-bottom:13px}
+.chart-wrap{position:relative;height:260px}
+.chart-wrap-t{position:relative;height:310px}
+.nodata-chart{display:flex;align-items:center;justify-content:center;height:260px;font-size:13px;color:var(--text3);font-style:italic;text-align:center}
+
+/* ── Product Table ── */
+.tc{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 2px 8px rgba(97,62,152,.07);border:1px solid var(--border);overflow-x:auto}
+.tc-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.tc-header h3{font-size:12.5px;font-weight:800;color:var(--purple-d)}
+.tc-note{font-size:10px;color:var(--text3);margin-top:10px;font-style:italic}
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead{position:sticky;top:0;z-index:10;background:#fff}
+thead th{font-size:9.5px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.06em;padding:0;border-bottom:2px solid var(--purple-l);text-align:left;white-space:nowrap;background:#fff}
+.th-inner{display:flex;align-items:center;gap:3px;padding:7px 8px;cursor:pointer;user-select:none;position:relative}
+.th-inner:hover{background:var(--purple-l);border-radius:5px}
+.th-sort{font-size:8px;color:var(--text3);margin-left:1px}
+th.sort-asc .th-sort::after{content:'▲';color:var(--purple)}
+th.sort-desc .th-sort::after{content:'▼';color:var(--purple)}
+.th-sort::after{content:'⬍'}
+.th-filter-btn{background:none;border:none;cursor:pointer;padding:2px 3px;border-radius:4px;color:var(--text3);font-size:10px;line-height:1;flex-shrink:0;transition:all .15s}
+.th-filter-btn:hover,.th-filter-btn.active{color:var(--purple);background:var(--purple-l)}
+.th-filter-btn.has-filter{color:var(--purple);font-weight:900}
+.fp{position:absolute;top:calc(100% + 2px);left:0;background:#fff;border:1.5px solid var(--purple-mid);border-radius:9px;padding:10px 11px;z-index:500;min-width:170px;box-shadow:0 6px 20px rgba(0,0,0,.13);display:none}
+.fp.open{display:block}
+.fp-title{font-size:9.5px;font-weight:800;color:var(--purple);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px}
+.fp input{width:100%;padding:5px 8px;border:1.5px solid var(--border);border-radius:5px;font-size:12px;color:var(--text);margin-bottom:5px;font-family:inherit}
+.fp input:focus{outline:none;border-color:var(--purple)}
+.fp-row{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.fp-row span{font-size:11px;color:var(--text3);flex-shrink:0}
+.fp-row input{width:70px;margin-bottom:0;text-align:center}
+.fp-clear{width:100%;padding:4px;border:none;background:var(--purple-l);color:var(--purple);border-radius:5px;cursor:pointer;font-size:11px;font-weight:700;margin-top:2px;font-family:inherit}
+.fp-clear:hover{background:#ddd5f5}
+tbody td{padding:8px;border-bottom:1px solid #f5f0ff;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#faf8ff}
+.prod-cell{max-width:240px}
+.prod-name{font-size:11.5px;line-height:1.3;word-break:break-word;color:var(--text)}
+.prod-sku{font-size:9.5px;color:var(--text3);margin-top:1.5px;font-weight:700;font-family:monospace;letter-spacing:.02em}
+.sr-col{font-size:11px;font-weight:800;color:var(--text3);text-align:center;min-width:28px}
+.badge{display:inline-block;padding:2px 7px;border-radius:20px;font-size:10.5px;font-weight:800}
+.bg-g{background:#C8E6C9;color:#1B5E20}
+.bg-y{background:#FFF3E0;color:#BF360C}
+.bg-r{background:#FFCDD2;color:#7F0000}
+.nodata{text-align:center;padding:36px;color:var(--text3);font-size:13px}
+
+/* ── Show All Button ── */
+.show-all-wrap{text-align:center;padding:16px 0 4px;display:none}
+.btn-show-all{background:var(--yellow);color:var(--purple-d);border:none;padding:11px 32px;border-radius:9px;font-size:13px;font-weight:900;cursor:pointer;font-family:inherit;transition:all .2s;box-shadow:0 3px 12px rgba(255,205,0,.45);letter-spacing:.02em}
+.btn-show-all:hover{background:var(--yellow-d);transform:translateY(-1px);box-shadow:0 5px 16px rgba(200,162,0,.5)}
+
+/* ── TAT Cards ── */
+.tat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:13px}
+@media(max-width:900px){.tat-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:520px){.tat-grid{grid-template-columns:1fr}}
+.tat-card{background:#fff;border-radius:14px;padding:16px 18px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(97,62,152,.07);border-left:4px solid var(--purple)}
+.tat-card .tc-lbl{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:6px}
+.tat-val-row{display:flex;align-items:baseline;gap:4px;margin-bottom:4px}
+.tat-val{font-size:28px;font-weight:900;color:var(--purple-d);letter-spacing:-1px}
+.tat-unit{font-size:12px;font-weight:600;color:var(--text3)}
+.tat-sub{font-size:11px;color:var(--text3)}
+.tat-del-row{display:flex;gap:10px;margin-top:6px;flex-wrap:wrap}
+.tat-del-badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:12px;background:var(--purple-l);color:var(--purple)}
+
+/* ── Insights Section ── */
+.ins-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-bottom:13px}
+@media(max-width:1100px){.ins-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.ins-grid{grid-template-columns:1fr}}
+.ins-card{background:#fff;border-radius:14px;padding:16px 18px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(97,62,152,.07)}
+.ic-ico{font-size:20px;margin-bottom:6px;display:block}
+.ic-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--text2);margin-bottom:3px}
+.ic-val{font-size:22px;font-weight:900;color:var(--purple-d)}
+.ic-sub{font-size:11px;color:var(--text3);margin-top:3px}
+.ic-note{font-size:10px;color:var(--purple);margin-top:8px;line-height:1.5;background:var(--purple-l);padding:6px 8px;border-radius:6px;font-weight:600}
+.cmp-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--purple-l)}
+.cmp-row:last-child{border-bottom:none}
+.cmp-label{font-size:12px;font-weight:700;color:var(--text2)}
+.cmp-vals{display:flex;gap:8px;align-items:center}
+.cmp-val{font-size:13px;font-weight:900;color:var(--purple-d)}
+.cmp-tag{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:10px}
+.cmp-tag.good{background:#C8E6C9;color:#1B5E20}
+.cmp-tag.bad{background:#FFCDD2;color:#7F0000}
+.cmp-tag.mid{background:#FFF3E0;color:#BF360C}
+.ratt-row{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--purple-l)}
+.ratt-row:last-child{border-bottom:none}
+.ratt-num{width:20px;height:20px;border-radius:50%;background:var(--purple);color:#fff;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ratt-label{font-size:12px;color:var(--text2);flex:1}
+.ratt-val{font-size:13px;font-weight:900;color:var(--purple-d)}
+</style>
+</head>
+<body>
+
+<!-- ── HEADER ── -->
+<header class="hdr">
+  <div class="hdr-brand">
+    <div class="hdr-logo">MM</div>
+    <div class="hdr-text">
+      <h1>Mumma Mall</h1>
+      <p id="hdrSub">Delivery Analytics · Upload your Shiprocket export to begin</p>
+    </div>
+  </div>
+  <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
+  <input type="file" id="csvInput" accept=".csv" style="display:none">
+</header>
+
+<!-- ── UPLOAD ── -->
+<section id="uploadSection">
+  <div class="upload-box" id="uploadBox">
+    <span class="uicon">🛍️</span>
+    <h2>Upload Shiprocket Export</h2>
+    <p>Drag &amp; drop your CSV here, or click to browse</p>
+    <small>Standard Shiprocket order export · All data stays in your browser</small>
+  </div>
+</section>
+
+<!-- ── DASHBOARD ── -->
+<section id="dash">
+
+  <!-- Filters -->
+  <div class="fbar">
+    <div class="fg"><label>From Date</label><input type="date" id="fFrom"></div>
+    <div class="fg"><label>To Date</label><input type="date" id="fTo"></div>
+
+    <div class="ms-wrap" id="msWrap">
+      <label>Products</label>
+      <div class="ms-trigger" id="msTrigger" onclick="toggleMS(event)">
+        <span class="ms-trigger-txt" id="msTriggerTxt">All Products</span>
+        <span class="ms-arrow" id="msArrow">▾</span>
+      </div>
+    </div>
+    <div class="ms-dropdown" id="msDropdown">
+      <div class="ms-search-row">
+        <input class="ms-search-inp" type="text" id="msSearch" placeholder="Search products…" autocomplete="off" oninput="filterMSOpts()">
+      </div>
+      <div class="ms-opts" id="msOpts"><div class="ms-empty">No products loaded</div></div>
+      <div class="ms-footer">
+        <button class="ms-btn-clear" onclick="clearMS()">✕ Clear All</button>
+        <button class="ms-btn-all" onclick="selectVisibleMS()">✓ Select Visible</button>
+      </div>
+    </div>
+
+    <div class="fg"><label>COD Min (₹)</label><input type="number" id="fCodMin" placeholder="Any" style="min-width:90px"></div>
+    <div class="fg"><label>COD Max (₹)</label><input type="number" id="fCodMax" placeholder="Any" style="min-width:90px"></div>
+    <div class="fg"><label>Attempts ≥</label><input type="number" id="fAttMin" placeholder="Any" min="0" style="min-width:78px"></div>
+    <div class="fg"><label>Attempts ≤</label><input type="number" id="fAttMax" placeholder="Any" min="0" style="min-width:78px"></div>
+
+    <div class="upsell-toggle active" id="upsellToggle" onclick="toggleUpsell()">
+      <div class="toggle-dot" id="toggleDot"></div>
+      <span id="upsellLabel">Hide Upsell Items</span>
+    </div>
+
+    <button class="btn-rst" onclick="resetFilters()">↺ Reset</button>
+    <span class="rcount" id="rcount"></span>
+  </div>
+
+  <!-- ===== SECTION: OVERVIEW ===== -->
+  <div class="sec-div">
+    <h2>📊 Overview Dashboard</h2>
+    <div class="sd-line"></div>
+    <span class="sec-tag">Main</span>
+  </div>
+
+  <!-- KPIs -->
+  <div class="kgrid">
+    <div class="kpi k-green">
+      <span class="kpi-ico">✅</span>
+      <div class="kpi-lbl">Delivery %</div>
+      <div class="kpi-val" id="kDel">—</div>
+      <div class="kpi-sub" id="kDelSub"></div>
+      <div class="kpi-note">of shipped orders</div>
+    </div>
+    <div class="kpi k-orange">
+      <span class="kpi-ico">⏳</span>
+      <div class="kpi-lbl">Unfulfilled %</div>
+      <div class="kpi-val" id="kUnf">—</div>
+      <div class="kpi-sub" id="kUnfSub"></div>
+      <div class="kpi-note">of all orders</div>
+    </div>
+    <div class="kpi k-purple">
+      <span class="kpi-ico">🎯</span>
+      <div class="kpi-lbl">1st Attempt Delivery %</div>
+      <div class="kpi-val" id="kFAD">—</div>
+      <div class="kpi-sub" id="kFADSub"></div>
+      <div class="kpi-note">of delivery-attempted orders</div>
+    </div>
+    <div class="kpi k-red">
+      <span class="kpi-ico">🚫</span>
+      <div class="kpi-lbl">Non-Pickup Orders</div>
+      <div class="kpi-val" id="kNP">—</div>
+      <div class="kpi-sub" id="kNPSub"></div>
+    </div>
+  </div>
+
+  <!-- Sub Metrics -->
+  <div class="sgrid">
+    <div class="sc"><div class="sl">Total Orders</div><div class="sv" id="mTotal">—</div></div>
+    <div class="sc"><div class="sl">Shipped Orders</div><div class="sv" id="mShipped">—</div></div>
+    <div class="sc"><div class="sl">RTO % <span style="font-size:8px;font-weight:400">(of shipped)</span></div><div class="sv" id="mRTO">—</div></div>
+    <div class="sc"><div class="sl">Total COD Payable</div><div class="sv" id="mCodT">—</div></div>
+    <div class="sc"><div class="sl">Total Attempts</div><div class="sv" id="mAttT">—</div></div>
+    <div class="sc"><div class="sl">Avg Attempts / Order</div><div class="sv" id="mAttA">—</div></div>
+  </div>
+
+  <!-- Charts Row 1: Status + Trend (smooth line) -->
+  <div class="cgrid">
+    <div class="cc"><h3>📊 Order Status Distribution</h3><div class="chart-wrap"><canvas id="cStatus"></canvas></div></div>
+    <div class="cc"><h3>📈 Daily Orders Trend</h3><div class="chart-wrap"><canvas id="cTrend"></canvas></div></div>
+  </div>
+
+  <!-- Charts Row 2: State + City Tier -->
+  <div class="cgrid">
+    <div class="cc">
+      <h3>🗺️ Orders by State &amp; Delivery %</h3>
+      <div class="chart-wrap-t"><canvas id="cState"></canvas><div class="nodata-chart" id="ndState" style="display:none">No Shipping State data found in CSV</div></div>
+    </div>
+    <div class="cc">
+      <h3>🏙️ Orders by City Tier &amp; Delivery %</h3>
+      <div class="chart-wrap-t"><canvas id="cTier"></canvas><div class="nodata-chart" id="ndTier" style="display:none">No Shipping City data found in CSV</div></div>
+    </div>
+  </div>
+
+  <!-- Product Performance Breakdown -->
+  <div class="tc">
+    <div class="tc-header">
+      <h3>📋 Product Performance Breakdown</h3>
+      <span style="font-size:11px;color:var(--text3)" id="tableInfo"></span>
+    </div>
+    <table id="prodTable">
+      <thead id="prodThead">
+        <tr>
+          <th style="min-width:34px;text-align:center"><div class="th-inner" style="justify-content:center">#</div></th>
+          <th data-col="name" data-type="text">
+            <div class="th-inner" onclick="sortBy('name')">Product / SKU<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'name')" title="Filter">⊟</button>
+            <div class="fp" id="fp-name">
+              <div class="fp-title">Filter by name</div>
+              <input type="text" id="fi-name" placeholder="Type to search…" oninput="setCF('name',this.value)">
+              <button class="fp-clear" onclick="clearCF('name')">Clear</button>
+            </div>
+          </th>
+          <th data-col="cnt" data-type="num">
+            <div class="th-inner" onclick="sortBy('cnt')">Orders<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'cnt')" title="Filter">⊟</button>
+            <div class="fp" id="fp-cnt"><div class="fp-title">Orders range</div><div class="fp-row"><input type="number" id="fi-cnt-min" placeholder="Min" oninput="setCFR('cnt','min',this.value)"><span>–</span><input type="number" id="fi-cnt-max" placeholder="Max" oninput="setCFR('cnt','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('cnt')">Clear</button></div>
+          </th>
+          <th data-col="shipped" data-type="num">
+            <div class="th-inner" onclick="sortBy('shipped')">Shipped<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'shipped')" title="Filter">⊟</button>
+            <div class="fp" id="fp-shipped"><div class="fp-title">Shipped range</div><div class="fp-row"><input type="number" id="fi-shipped-min" placeholder="Min" oninput="setCFR('shipped','min',this.value)"><span>–</span><input type="number" id="fi-shipped-max" placeholder="Max" oninput="setCFR('shipped','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('shipped')">Clear</button></div>
+          </th>
+          <th data-col="del" data-type="num">
+            <div class="th-inner" onclick="sortBy('del')">Delivered<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'del')" title="Filter">⊟</button>
+            <div class="fp" id="fp-del"><div class="fp-title">Delivered range</div><div class="fp-row"><input type="number" id="fi-del-min" placeholder="Min" oninput="setCFR('del','min',this.value)"><span>–</span><input type="number" id="fi-del-max" placeholder="Max" oninput="setCFR('del','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('del')">Clear</button></div>
+          </th>
+          <th data-col="delPct" data-type="num">
+            <div class="th-inner" onclick="sortBy('delPct')">Delivery %*<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'delPct')" title="Filter">⊟</button>
+            <div class="fp" id="fp-delPct"><div class="fp-title">Delivery % range</div><div class="fp-row"><input type="number" id="fi-delPct-min" placeholder="Min %" oninput="setCFR('delPct','min',this.value)"><span>–</span><input type="number" id="fi-delPct-max" placeholder="Max %" oninput="setCFR('delPct','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('delPct')">Clear</button></div>
+          </th>
+          <th data-col="rto" data-type="num">
+            <div class="th-inner" onclick="sortBy('rto')">RTO<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'rto')" title="Filter">⊟</button>
+            <div class="fp" id="fp-rto"><div class="fp-title">RTO range</div><div class="fp-row"><input type="number" id="fi-rto-min" placeholder="Min" oninput="setCFR('rto','min',this.value)"><span>–</span><input type="number" id="fi-rto-max" placeholder="Max" oninput="setCFR('rto','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('rto')">Clear</button></div>
+          </th>
+          <th data-col="rtoPct" data-type="num">
+            <div class="th-inner" onclick="sortBy('rtoPct')">RTO %*<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'rtoPct')" title="Filter">⊟</button>
+            <div class="fp" id="fp-rtoPct"><div class="fp-title">RTO % range</div><div class="fp-row"><input type="number" id="fi-rtoPct-min" placeholder="Min %" oninput="setCFR('rtoPct','min',this.value)"><span>–</span><input type="number" id="fi-rtoPct-max" placeholder="Max %" oninput="setCFR('rtoPct','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('rtoPct')">Clear</button></div>
+          </th>
+          <th data-col="fadPct" data-type="num">
+            <div class="th-inner" onclick="sortBy('fadPct')">1st Att Del %<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'fadPct')" title="Filter">⊟</button>
+            <div class="fp" id="fp-fadPct"><div class="fp-title">1st Att Del % range</div><div class="fp-row"><input type="number" id="fi-fadPct-min" placeholder="Min %" oninput="setCFR('fadPct','min',this.value)"><span>–</span><input type="number" id="fi-fadPct-max" placeholder="Max %" oninput="setCFR('fadPct','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('fadPct')">Clear</button></div>
+          </th>
+          <th data-col="codSum" data-type="num">
+            <div class="th-inner" onclick="sortBy('codSum')">Total COD (₹)<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'codSum')" title="Filter">⊟</button>
+            <div class="fp" id="fp-codSum"><div class="fp-title">COD ₹ range</div><div class="fp-row"><input type="number" id="fi-codSum-min" placeholder="Min" oninput="setCFR('codSum','min',this.value)"><span>–</span><input type="number" id="fi-codSum-max" placeholder="Max" oninput="setCFR('codSum','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('codSum')">Clear</button></div>
+          </th>
+          <th data-col="avgAtt" data-type="num">
+            <div class="th-inner" onclick="sortBy('avgAtt')">Avg Attempts<span class="th-sort"></span></div>
+            <button class="th-filter-btn" onclick="openFP(event,'avgAtt')" title="Filter">⊟</button>
+            <div class="fp" id="fp-avgAtt"><div class="fp-title">Avg attempts range</div><div class="fp-row"><input type="number" id="fi-avgAtt-min" placeholder="Min" step="0.1" oninput="setCFR('avgAtt','min',this.value)"><span>–</span><input type="number" id="fi-avgAtt-max" placeholder="Max" step="0.1" oninput="setCFR('avgAtt','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('avgAtt')">Clear</button></div>
+          </th>
+        </tr>
+      </thead>
+      <tbody id="prodTbody"><tr><td colspan="11" class="nodata">Upload a CSV to see data</td></tr></tbody>
+    </table>
+    <div class="show-all-wrap" id="showAllWrap">
+      <button class="btn-show-all" id="btnShowAll" onclick="toggleShowAll()">Show All Products</button>
+    </div>
+    <p class="tc-note">* Delivery % and RTO % calculated on shipped orders (excluding NEW ORDER). COD total = COD payment method only.</p>
+  </div>
+
+  <!-- ===== SECTION: TAT ANALYTICS ===== -->
+  <div class="sec-div">
+    <h2>⏱️ Turnaround Time Analytics</h2>
+    <div class="sd-line"></div>
+    <span class="sec-tag">Logistics</span>
+  </div>
+
+  <div class="tat-grid">
+    <div class="tat-card">
+      <div class="tc-lbl">Order → Pickup TAT</div>
+      <div class="tat-val-row"><span class="tat-val" id="tatOP">—</span><span class="tat-unit" id="tatOPU">days avg</span></div>
+      <div class="tat-sub" id="tatOPSub"></div>
+      <div class="tat-del-row" id="tatOPDel"></div>
+    </div>
+    <div class="tat-card">
+      <div class="tc-lbl">Pickup → Delivery TAT</div>
+      <div class="tat-val-row"><span class="tat-val" id="tatPD">—</span><span class="tat-unit" id="tatPDU">days avg</span></div>
+      <div class="tat-sub" id="tatPDSub"></div>
+      <div class="tat-del-row" id="tatPDDel"></div>
+    </div>
+    <div class="tat-card">
+      <div class="tc-lbl">Order → Delivery TAT</div>
+      <div class="tat-val-row"><span class="tat-val" id="tatOD">—</span><span class="tat-unit" id="tatODU">days avg</span></div>
+      <div class="tat-sub" id="tatODSub"></div>
+      <div class="tat-del-row" id="tatODDel"></div>
+    </div>
+  </div>
+
+  <div class="cgrid">
+    <div class="cc">
+      <h3>📦 Pickup TAT Distribution</h3>
+      <div class="chart-wrap"><canvas id="cTatDist"></canvas></div>
+    </div>
+    <div class="cc">
+      <h3>📉 Pickup TAT Impact on Delivery %</h3>
+      <div class="chart-wrap"><canvas id="cTatImpact"></canvas></div>
+    </div>
+  </div>
+
+  <!-- ===== SECTION: BUSINESS & ADVERTISER INSIGHTS ===== -->
+  <div class="sec-div">
+    <h2>💡 Business &amp; Advertiser Insights</h2>
+    <div class="sd-line"></div>
+    <span class="sec-tag">Strategy</span>
+  </div>
+
+  <div class="ins-grid">
+    <div class="ins-card">
+      <span class="ic-ico">💳</span>
+      <div class="ic-label">COD vs Prepaid Split</div>
+      <div class="ic-val" id="iCodPct">—</div>
+      <div class="ic-sub" id="iCodSub"></div>
+      <div class="ic-note" id="iCodNote"></div>
+    </div>
+    <div class="ins-card">
+      <span class="ic-ico">🔄</span>
+      <div class="ic-label">NDR Recovery Rate</div>
+      <div class="ic-val" id="iNDR">—</div>
+      <div class="ic-sub" id="iNDRSub"></div>
+      <div class="ic-note" id="iNDRNote"></div>
+    </div>
+    <div class="ins-card">
+      <span class="ic-ico">⚠️</span>
+      <div class="ic-label">Revenue at Risk (RTO)</div>
+      <div class="ic-val" id="iRAR">—</div>
+      <div class="ic-sub" id="iRARSub"></div>
+      <div class="ic-note" id="iRARNote"></div>
+    </div>
+    <div class="ins-card">
+      <span class="ic-ico">📡</span>
+      <div class="ic-label">Re-attempt Efficiency</div>
+      <div id="iReattempt"><div class="ic-sub" style="padding-top:4px">Upload data to see</div></div>
+    </div>
+  </div>
+
+  <div class="cgrid">
+    <div class="cc">
+      <h3>💳 COD vs Prepaid Delivery Performance</h3>
+      <div class="chart-wrap"><canvas id="cPayment"></canvas></div>
+    </div>
+    <div class="cc">
+      <h3>📅 Orders &amp; Delivery % by Day of Week</h3>
+      <div class="chart-wrap"><canvas id="cWeekday"></canvas></div>
+    </div>
+  </div>
+
+</section>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────
+let rawRows       = [];
+let orderMap      = {};
+let upsellOnlyIds = new Set(); // order IDs where ALL product rows are upsell SKUs
+let charts        = {};
+let tableData     = [];
+let sortCol       = 'cnt', sortAsc = false;
+let selectedProds = new Set();
+let hideUpsell    = true;
+let showAllProds  = false;
+let detectedCols  = { state: null, city: null, deliveredDate: null };
+
+// ── Column filter state ─────────────────────────────────────────────
+const CF = {
+  name:    '',
+  cnt:     {min:'',max:''},
+  shipped: {min:'',max:''},
+  del:     {min:'',max:''},
+  delPct:  {min:'',max:''},
+  rto:     {min:'',max:''},
+  rtoPct:  {min:'',max:''},
+  fadPct:  {min:'',max:''},
+  codSum:  {min:'',max:''},
+  avgAtt:  {min:'',max:''},
+};
+
+// ── Column names (exact Shiprocket CSV headers) ─────────────────────
+const C = {
+  ORDER_ID  : 'Order ID',
+  CREATED   : 'Shiprocket Created At',
+  STATUS    : 'Status',
+  PROD_NAME : 'Product Name',
+  MASTER_SKU: 'Master SKU',
+  COD       : 'COD Payble Amount',   // Shiprocket typo preserved
+  ATTEMPTS  : 'Attempt Count',
+  PICKUP_SCH: 'Pickup Scheduled Date',
+  PICKED_UP : 'Order Picked Up Date',
+  PAYMENT   : 'Payment Method',
+};
+
+// Chart.js needs literal hex (CSS vars don't work inside Chart.js options)
+const VAR_PURPLE   = '#613e98';
+const VAR_PURPLE_D = '#3c2b60';
+const VAR_PURPLE_L = '#eef1ff';
+const VAR_YELLOW   = '#ffcd00';
+
+// ── City Tier Lookup ────────────────────────────────────────────────
+const TIER1 = new Set([
+  'mumbai','navi mumbai','thane','delhi','new delhi','bangalore','bengaluru',
+  'chennai','hyderabad','kolkata','pune','ahmedabad','gurgaon','gurugram',
+  'noida','greater noida','faridabad'
+]);
+const TIER2 = new Set([
+  'surat','jaipur','lucknow','kanpur','nagpur','patna','indore','bhopal',
+  'visakhapatnam','vizag','vadodara','ludhiana','agra','nashik','rajkot',
+  'varanasi','benaras','srinagar','aurangabad','dhanbad','amritsar',
+  'prayagraj','allahabad','ranchi','howrah','coimbatore','jabalpur','gwalior',
+  'vijayawada','jodhpur','madurai','raipur','kochi','cochin','chandigarh',
+  'guwahati','hubli','dharwad','mysore','mysuru','thiruvananthapuram','trivandrum',
+  'tiruchirappalli','trichy','bhubaneswar','salem','warangal','guntur','bhiwandi',
+  'saharanpur','gorakhpur','bikaner','amravati','jamshedpur','bhilai','cuttack',
+  'firozabad','kota','dehradun','durgapur','asansol','rourkela','nanded',
+  'kolhapur','ajmer','gulbarga','kalaburagi','jamnagar','ujjain','siliguri',
+  'jhansi','mangaluru','mangalore','erode','belgaum','belagavi','tirunelveli',
+  'malegaon','gaya','jalgaon','udaipur','davangere','bellary','patiala',
+  'bhagalpur','tirupati','agartala','puducherry','pondicherry','aligarh',
+  'pimpri','pimpri-chinchwad','meerut','kalyan','dombivli','vasai','virar',
+  'bhavnagar','moradabad','anand','loni','modinagar','hapur','muzaffarnagar',
+  'nellore','eluru','kakinada','rajahmundry','vizianagaram','hubli-dharwad'
+]);
+const getCityTier = city => {
+  if (!city) return 'Unknown';
+  const c = city.toLowerCase().trim().replace(/\s+/g,' ');
+  if (TIER1.has(c)) return 'Tier 1';
+  if (TIER2.has(c)) return 'Tier 2';
+  return 'Tier 3';
+};
+
+// ── Utils ───────────────────────────────────────────────────────────
+const isNA = v => !v || ['','N/A','null','undefined'].includes(String(v).trim());
+function parseDate(s) {
+  if (isNA(s)) return null;
+  const d = new Date(String(s).trim().replace(' ','T'));
+  return isNaN(d.getTime()) ? null : d;
+}
+const ymd       = d => d ? d.toISOString().slice(0,10) : '';
+const fmtINR    = n => isFinite(n) ? '₹'+Math.round(n).toLocaleString('en-IN') : '—';
+const pct       = (num,den) => !den ? '0.0%' : (num/den*100).toFixed(1)+'%';
+const esc       = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const set       = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
+const setHTML   = (id,html) => { const el=document.getElementById(id); if(el) el.innerHTML=html; };
+const diffDays  = (d1,d2) => d1&&d2 ? (d2-d1)/86400000 : null;
+const isUpsellSKU = sku => /^\d{10,}$/.test((sku||'').trim());
+
+// ── Auto-detect columns that might differ between Shiprocket export versions ──
+function detectColumns(headers) {
+  const lower = headers.map(h => h.toLowerCase());
+  const find = terms => headers.find((_,i) => terms.every(t => lower[i].includes(t))) || null;
+  detectedCols = {
+    state        : find(['state']),
+    city         : find(['city']),
+    deliveredDate: find(['delivered','date']) || find(['delivery','date']),
+  };
+}
+
+// ── File Upload ─────────────────────────────────────────────────────
+const uploadBox = document.getElementById('uploadBox');
+const csvInput  = document.getElementById('csvInput');
+uploadBox.addEventListener('click', () => csvInput.click());
+uploadBox.addEventListener('dragover', e => { e.preventDefault(); uploadBox.classList.add('dragover'); });
+uploadBox.addEventListener('dragleave', () => uploadBox.classList.remove('dragover'));
+uploadBox.addEventListener('drop', e => {
+  e.preventDefault(); uploadBox.classList.remove('dragover');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+csvInput.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); e.target.value=''; });
+
+function handleFile(file) {
+  Papa.parse(file, {
+    header:true, skipEmptyLines:true,
+    complete(res) { initData(res.data, file.name, res.meta.fields||[]); },
+    error(err)    { alert('CSV parse error: '+err.message); }
+  });
+}
+
+// ── Init ────────────────────────────────────────────────────────────
+function initData(rows, filename, headers) {
+  rawRows  = rows;
+  orderMap = {};
+  selectedProds.clear();
+  showAllProds = false;
+
+  detectColumns(headers);
+
+  // Build orderMap (first row per Order ID)
+  rows.forEach(r => {
+    const id = (r[C.ORDER_ID]||'').trim();
+    if (id && id !== 'Order ID' && !orderMap[id]) orderMap[id] = r;
+  });
+
+  // Compute upsell-only order IDs (all product rows have numeric-only SKUs)
+  const orderHasMain = {};
+  rows.forEach(r => {
+    const oid = (r[C.ORDER_ID]||'').trim();
+    if (!oid) return;
+    if (!(oid in orderHasMain)) orderHasMain[oid] = false;
+    if (!isUpsellSKU((r[C.MASTER_SKU]||'').trim())) orderHasMain[oid] = true;
+  });
+  upsellOnlyIds = new Set(Object.entries(orderHasMain).filter(([,v])=>!v).map(([k])=>k));
+
+  // Build product SKU map & populate multi-select
+  const prodSkuMap = {};
+  rows.forEach(r => {
+    const name = (r[C.PROD_NAME]||'').trim();
+    const sku  = (r[C.MASTER_SKU]||'').trim();
+    if (name && !prodSkuMap[name]) prodSkuMap[name] = sku;
+  });
+  const allProds = Object.keys(prodSkuMap).sort();
+  const opts = document.getElementById('msOpts');
+  opts.innerHTML = allProds.length
+    ? allProds.map(p => `
+        <label class="ms-opt${hideUpsell && isUpsellSKU(prodSkuMap[p]) ? ' hidden' : ''}" data-name="${esc(p.toLowerCase())}" data-sku="${esc(prodSkuMap[p]||'')}">
+          <input type="checkbox" value="${esc(p)}" onchange="onProdCheck(this)">
+          <span class="ms-opt-name">${esc(p)}</span>
+        </label>`).join('')
+    : '<div class="ms-empty">No products found</div>';
+  updateMSTrigger();
+
+  // Date range defaults
+  const dates = Object.values(orderMap).map(r=>parseDate(r[C.CREATED])).filter(Boolean).sort((a,b)=>a-b);
+  if (dates.length) {
+    document.getElementById('fFrom').value = ymd(dates[0]);
+    document.getElementById('fTo').value   = ymd(dates[dates.length-1]);
+  }
+
+  document.getElementById('uploadSection').style.display = 'none';
+  document.getElementById('dash').classList.add('on');
+  document.getElementById('changeBtn').style.display = 'block';
+  document.getElementById('hdrSub').textContent = `${filename}  ·  ${Object.keys(orderMap).length.toLocaleString()} unique orders`;
+
+  applyFilters();
+}
+
+// ── Upsell Toggle ───────────────────────────────────────────────────
+function toggleUpsell() {
+  hideUpsell = !hideUpsell;
+  const btn = document.getElementById('upsellToggle');
+  btn.classList.toggle('active', hideUpsell);
+  document.getElementById('upsellLabel').textContent = hideUpsell ? 'Hide Upsell Items' : 'Show Upsell Items';
+  document.querySelectorAll('#msOpts .ms-opt').forEach(el => {
+    const sku = el.dataset.sku || '';
+    if (hideUpsell && isUpsellSKU(sku)) {
+      el.classList.add('hidden');
+      const cb = el.querySelector('input');
+      if (cb && cb.checked) { cb.checked=false; selectedProds.delete(cb.value); }
+    } else {
+      el.classList.remove('hidden');
+    }
+  });
+  filterMSOpts();
+  updateMSTrigger();
+  applyFilters();
+}
+
+// ── Multi-Select ────────────────────────────────────────────────────
+function toggleMS(e) {
+  e.stopPropagation();
+  const dd = document.getElementById('msDropdown');
+  const wasOpen = dd.classList.contains('open');
+  closeAllPopups();
+  if (!wasOpen) {
+    dd.classList.add('open');
+    const rect = document.getElementById('msTrigger').getBoundingClientRect();
+    const ddW  = window.innerWidth * 0.75;
+    let left   = rect.left;
+    if (left + ddW > window.innerWidth - 8) left = window.innerWidth - ddW - 8;
+    dd.style.top  = (rect.bottom + 5) + 'px';
+    dd.style.left = Math.max(8, left) + 'px';
+    document.getElementById('msArrow').style.transform = 'rotate(180deg)';
+    const si = document.getElementById('msSearch');
+    si.value = ''; filterMSOpts(); si.focus();
+  }
+}
+function closeMS() {
+  document.getElementById('msDropdown').classList.remove('open');
+  document.getElementById('msArrow').style.transform = '';
+}
+document.addEventListener('click', e => {
+  if (!document.getElementById('msWrap').contains(e.target) &&
+      !document.getElementById('msDropdown').contains(e.target)) closeMS();
+  if (!e.target.closest('.th-filter-btn') && !e.target.closest('.fp')) {
+    document.querySelectorAll('.fp.open').forEach(p => p.classList.remove('open'));
+  }
+});
+function onProdCheck(cb) {
+  if (cb.checked) selectedProds.add(cb.value);
+  else selectedProds.delete(cb.value);
+  updateMSTrigger(); applyFilters();
+}
+function updateMSTrigger() {
+  const trigger = document.getElementById('msTrigger');
+  const txt     = document.getElementById('msTriggerTxt');
+  if (selectedProds.size === 0) { txt.textContent='All Products'; trigger.classList.remove('has-sel'); }
+  else if (selectedProds.size === 1) { const n=[...selectedProds][0]; txt.textContent=n.length>42?n.slice(0,42)+'…':n; trigger.classList.add('has-sel'); }
+  else { txt.textContent=`${selectedProds.size} products selected`; trigger.classList.add('has-sel'); }
+}
+function filterMSOpts() {
+  const q = document.getElementById('msSearch').value.toLowerCase().trim();
+  document.querySelectorAll('#msOpts .ms-opt').forEach(el => {
+    const upsellHidden = hideUpsell && isUpsellSKU(el.dataset.sku||'');
+    const searchHidden = q && !el.dataset.name.includes(q);
+    el.classList.toggle('hidden', upsellHidden || searchHidden);
+  });
+}
+function clearMS() {
+  selectedProds.clear();
+  document.querySelectorAll('#msOpts .ms-opt input').forEach(cb => cb.checked=false);
+  updateMSTrigger(); applyFilters();
+}
+function selectVisibleMS() {
+  document.querySelectorAll('#msOpts .ms-opt:not(.hidden) input').forEach(cb => {
+    cb.checked=true; selectedProds.add(cb.value);
+  });
+  updateMSTrigger(); applyFilters();
+}
+
+// ── Column Filters ──────────────────────────────────────────────────
+function openFP(e, col) {
+  e.stopPropagation();
+  const fp = document.getElementById('fp-'+col);
+  const wasOpen = fp.classList.contains('open');
+  document.querySelectorAll('.fp.open').forEach(p => p.classList.remove('open'));
+  closeMS();
+  if (!wasOpen) fp.classList.add('open');
+}
+function closeAllPopups() {
+  document.querySelectorAll('.fp.open').forEach(p => p.classList.remove('open'));
+  closeMS();
+}
+function setCF(col,val)        { CF[col]=val; updateFilterBtn(col); renderTable(); }
+function setCFR(col,side,val)  { CF[col][side]=val; updateFilterBtn(col); renderTable(); }
+function clearCF(col)          { CF[col]=''; document.getElementById('fi-'+col).value=''; updateFilterBtn(col); renderTable(); }
+function clearCFR(col) {
+  CF[col]={min:'',max:''};
+  const mn=document.getElementById('fi-'+col+'-min');
+  const mx=document.getElementById('fi-'+col+'-max');
+  if(mn) mn.value=''; if(mx) mx.value='';
+  updateFilterBtn(col); renderTable();
+}
+function updateFilterBtn(col) {
+  const btn = document.querySelector(`[onclick="openFP(event,'${col}')"]`);
+  if (!btn) return;
+  const f = CF[col];
+  const active = typeof f==='string' ? f!=='' : (f.min!==''||f.max!=='');
+  btn.classList.toggle('has-filter', active);
+}
+function applyColFilter(data) {
+  return data.filter(r => {
+    if (CF.name && !r.name.toLowerCase().includes(CF.name.toLowerCase())) return false;
+    for (const col of ['cnt','shipped','del','delPct','rto','rtoPct','fadPct','codSum','avgAtt']) {
+      const f=CF[col]; const v=r[col];
+      if (f.min!==''&&!isNaN(f.min)&&v<parseFloat(f.min)) return false;
+      if (f.max!==''&&!isNaN(f.max)&&v>parseFloat(f.max)) return false;
+    }
+    return true;
+  });
+}
+
+// ── Main Filters ────────────────────────────────────────────────────
+function getF() {
+  const v=id=>document.getElementById(id).value;
+  const n=id=>{const r=parseFloat(document.getElementById(id).value);return isNaN(r)?null:r;};
+  return {from:v('fFrom'),to:v('fTo'),codMin:n('fCodMin'),codMax:n('fCodMax'),attMin:n('fAttMin'),attMax:n('fAttMax')};
+}
+
+function applyFilters() {
+  const f = getF();
+  let orders = Object.values(orderMap);
+
+  // Exclude upsell-only orders from ALL calculations when toggle is on
+  if (hideUpsell) orders = orders.filter(o => !upsellOnlyIds.has((o[C.ORDER_ID]||'').trim()));
+
+  // Product multi-select
+  if (selectedProds.size > 0) {
+    const matchIds = new Set(
+      rawRows.filter(r=>selectedProds.has((r[C.PROD_NAME]||'').trim()))
+             .map(r=>(r[C.ORDER_ID]||'').trim()).filter(Boolean)
+    );
+    orders = orders.filter(o=>matchIds.has((o[C.ORDER_ID]||'').trim()));
+  }
+
+  // Date
+  if (f.from) { const d=new Date(f.from); orders=orders.filter(o=>{const x=parseDate(o[C.CREATED]);return x&&x>=d;}); }
+  if (f.to)   { const d=new Date(f.to+'T23:59:59'); orders=orders.filter(o=>{const x=parseDate(o[C.CREATED]);return x&&x<=d;}); }
+
+  // COD amount
+  if (f.codMin!=null) orders=orders.filter(o=>{const v=parseFloat(o[C.COD]);return isFinite(v)&&v>=f.codMin;});
+  if (f.codMax!=null) orders=orders.filter(o=>{const v=parseFloat(o[C.COD]);return isFinite(v)&&v<=f.codMax;});
+
+  // Attempts
+  if (f.attMin!=null) orders=orders.filter(o=>{const v=parseInt(o[C.ATTEMPTS]);return !isNaN(v)&&v>=f.attMin;});
+  if (f.attMax!=null) orders=orders.filter(o=>{const v=parseInt(o[C.ATTEMPTS]);return !isNaN(v)&&v<=f.attMax;});
+
+  render(orders);
+}
+
+let dbt;
+['fCodMin','fCodMax','fAttMin','fAttMax'].forEach(id =>
+  document.getElementById(id).addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applyFilters,380);})
+);
+['fFrom','fTo'].forEach(id => document.getElementById(id).addEventListener('change',applyFilters));
+
+function resetFilters() {
+  ['fFrom','fTo','fCodMin','fCodMax','fAttMin','fAttMax'].forEach(id=>document.getElementById(id).value='');
+  clearMS();
+}
+
+// ── Render ──────────────────────────────────────────────────────────
+function render(orders) {
+  const total = orders.length;
+  const sc    = {};
+  orders.forEach(o=>{ const s=(o[C.STATUS]||'Unknown').trim(); sc[s]=(sc[s]||0)+1; });
+
+  const DELIVERED = sc['DELIVERED']        || 0;
+  const RTO_DEL   = sc['RTO DELIVERED']    || 0;
+  const NEW_ORDER = sc['NEW ORDER']        || 0;
+  const PICK_EXC  = sc['PICKUP EXCEPTION'] || 0;
+  const shipped   = total - NEW_ORDER;
+
+  // FAD: delivered on attempt 1 / all delivery-attempted orders
+  const delivAttempted = orders.filter(o=>parseInt(o[C.ATTEMPTS])>=1).length;
+  const fadCount       = orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED'&&parseInt(o[C.ATTEMPTS])===1).length;
+
+  // Non-pickup
+  const PENDING_ST = new Set(['NEW ORDER','PICKUP SCHEDULED','OUT FOR PICKUP','CANCELED','CANCELLATION REQUESTED','SELF FULFILED']);
+  const nonPickup  = orders.filter(o=>{
+    const st=(o[C.STATUS]||'').trim();
+    return st==='PICKUP EXCEPTION'||(!isNA(o[C.PICKUP_SCH])&&isNA(o[C.PICKED_UP])&&!PENDING_ST.has(st));
+  }).length;
+
+  // COD: only 'cod' payment method
+  let codSum=0;
+  orders.forEach(o=>{
+    if ((o[C.PAYMENT]||'').toLowerCase().trim()==='cod') {
+      const v=parseFloat(o[C.COD]); if(isFinite(v)&&v>0) codSum+=v;
+    }
+  });
+
+  // Attempts
+  let attSum=0, attCnt=0;
+  orders.forEach(o=>{const v=parseInt(o[C.ATTEMPTS]);if(!isNaN(v)&&v>0){attSum+=v;attCnt++;}});
+
+  // KPIs
+  set('kDel',    shipped>0 ? pct(DELIVERED,shipped) : '—');
+  set('kDelSub', `${DELIVERED.toLocaleString()} of ${shipped.toLocaleString()} shipped`);
+  set('kUnf',    pct(NEW_ORDER,total));
+  set('kUnfSub', `${NEW_ORDER.toLocaleString()} of ${total.toLocaleString()} total orders`);
+  set('kFAD',    delivAttempted>0 ? pct(fadCount,delivAttempted) : '—');
+  set('kFADSub', `${fadCount.toLocaleString()} of ${delivAttempted.toLocaleString()} delivery-attempted`);
+  set('kNP',     nonPickup.toLocaleString());
+  set('kNPSub',  `${PICK_EXC.toLocaleString()} exceptions + missed pickups`);
+
+  // Sub metrics
+  set('mTotal',   total.toLocaleString());
+  set('mShipped', shipped.toLocaleString());
+  set('mRTO',     shipped>0 ? pct(RTO_DEL,shipped) : '—');
+  set('mCodT',    fmtINR(codSum));
+  set('mAttT',    attSum.toLocaleString());
+  set('mAttA',    attCnt>0 ? (attSum/attCnt).toFixed(2) : '—');
+  set('rcount',   `${total.toLocaleString()} orders`);
+
+  renderStatusChart(sc);
+  renderTrendChart(orders);
+  renderStateChart(orders);
+  renderCityTierChart(orders);
+  buildProductTable(orders);
+  renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total);
+  renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total);
+}
+
+// ── Status Chart ────────────────────────────────────────────────────
+function mkChart(id,type,data,opts) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id),{
+    type,data,options:{responsive:true,maintainAspectRatio:false,animation:{duration:220},...opts}
+  });
+}
+function sColor(s) {
+  if (s==='DELIVERED')            return '#2E7D32';
+  if (s.startsWith('RTO'))       return '#C62828';
+  if (s==='NEW ORDER')           return '#E65100';
+  if (s.includes('IN TRANSIT'))  return '#1565C0';
+  if (s.includes('UNDELIVERED')) return '#F57F17';
+  if (s.includes('CANCEL'))      return '#78909C';
+  if (s==='PICKUP EXCEPTION')    return '#6A1B9A';
+  if (s.includes('HUB'))         return '#00838F';
+  if (s==='OUT FOR DELIVERY')    return '#0277BD';
+  return '#BDBDBD';
+}
+function renderStatusChart(sc) {
+  const sorted=Object.entries(sc).sort((a,b)=>b[1]-a[1]).slice(0,12);
+  mkChart('cStatus','doughnut',{
+    labels:sorted.map(([s])=>s),
+    datasets:[{data:sorted.map(([,v])=>v),backgroundColor:sorted.map(([s])=>sColor(s)),borderWidth:2.5,borderColor:'#fff'}]
+  },{cutout:'52%',plugins:{legend:{position:'right',labels:{font:{size:10.5},boxWidth:11,padding:8}}}});
+}
+
+// ── Trend Chart (smooth line) ────────────────────────────────────────
+function renderTrendChart(orders) {
+  const by={};
+  orders.forEach(o=>{const d=parseDate(o[C.CREATED]);if(d){const k=ymd(d);by[k]=(by[k]||0)+1;}});
+  const days=Object.keys(by).sort();
+  mkChart('cTrend','line',{
+    labels:days,
+    datasets:[{
+      label:'Orders',data:days.map(d=>by[d]),
+      borderColor:VAR_PURPLE,backgroundColor:'rgba(97,62,152,.12)',
+      borderWidth:2.5,tension:0.4,fill:true,
+      pointBackgroundColor:VAR_PURPLE,pointRadius:3,pointHoverRadius:5
+    }]
+  },{plugins:{legend:{display:false}},scales:{
+    x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
+    y:{beginAtZero:true}
+  }});
+}
+
+// ── State Chart ─────────────────────────────────────────────────────
+function renderStateChart(orders) {
+  const canvas = document.getElementById('cState');
+  const ndEl   = document.getElementById('ndState');
+  if (!detectedCols.state) {
+    canvas.style.display='none'; ndEl.style.display='flex'; return;
+  }
+  canvas.style.display=''; ndEl.style.display='none';
+
+  const stateData = {};
+  orders.forEach(o=>{
+    const st=(o[detectedCols.state]||'').trim()||'Unknown';
+    if(!stateData[st]) stateData[st]={total:0,del:0,newOrd:0};
+    stateData[st].total++;
+    if((o[C.STATUS]||'').trim()==='DELIVERED') stateData[st].del++;
+    if((o[C.STATUS]||'').trim()==='NEW ORDER') stateData[st].newOrd++;
+  });
+
+  const sorted = Object.entries(stateData)
+    .sort((a,b)=>b[1].total-a[1].total).slice(0,14);
+  const labels   = sorted.map(([s])=>s);
+  const totals   = sorted.map(([,v])=>v.total);
+  const delPcts  = sorted.map(([,v])=>{
+    const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
+  });
+
+  mkChart('cState','bar',{
+    labels,
+    datasets:[
+      {type:'bar',label:'Orders',data:totals,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.15)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6}
+    ]
+  },{
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+}
+
+// ── City Tier Chart ─────────────────────────────────────────────────
+function renderCityTierChart(orders) {
+  const canvas = document.getElementById('cTier');
+  const ndEl   = document.getElementById('ndTier');
+  if (!detectedCols.city) {
+    canvas.style.display='none'; ndEl.style.display='flex'; return;
+  }
+  canvas.style.display=''; ndEl.style.display='none';
+
+  const tierData = {'Tier 1':{total:0,del:0,newOrd:0},'Tier 2':{total:0,del:0,newOrd:0},'Tier 3':{total:0,del:0,newOrd:0},'Unknown':{total:0,del:0,newOrd:0}};
+  orders.forEach(o=>{
+    const tier = getCityTier((o[detectedCols.city]||'').trim());
+    tierData[tier].total++;
+    if((o[C.STATUS]||'').trim()==='DELIVERED') tierData[tier].del++;
+    if((o[C.STATUS]||'').trim()==='NEW ORDER') tierData[tier].newOrd++;
+  });
+
+  const tiers    = Object.entries(tierData).filter(([,v])=>v.total>0);
+  const labels   = tiers.map(([t])=>t);
+  const totals   = tiers.map(([,v])=>v.total);
+  const delPcts  = tiers.map(([,v])=>{
+    const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
+  });
+  const colors   = ['rgba(97,62,152,.7)','rgba(97,62,152,.45)','rgba(97,62,152,.25)','rgba(155,127,204,.3)'];
+
+  mkChart('cTier','bar',{
+    labels,
+    datasets:[
+      {type:'bar',label:'Orders',data:totals,backgroundColor:colors.slice(0,labels.length),borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.15)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8}
+    ]
+  },{
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:11}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+}
+
+// ── Product Table ────────────────────────────────────────────────────
+function buildProductTable(orders) {
+  const ids = new Set(orders.map(o=>(o[C.ORDER_ID]||'').trim()));
+  const pm  = {};
+
+  rawRows.filter(r=>ids.has((r[C.ORDER_ID]||'').trim())).forEach(r=>{
+    const name=(r[C.PROD_NAME]||'').trim();
+    const sku =(r[C.MASTER_SKU]||'').trim();
+    const oid =(r[C.ORDER_ID]||'').trim();
+    if(!name||!oid) return;
+    if (hideUpsell && isUpsellSKU(sku)) return;
+    if(!pm[name]) pm[name]={orderIds:new Set(),sku};
+    pm[name].orderIds.add(oid);
+  });
+
+  tableData = Object.entries(pm).map(([name,{orderIds,sku}])=>{
+    const po     = orders.filter(o=>orderIds.has((o[C.ORDER_ID]||'').trim()));
+    const cnt    = po.length;
+    const newOrd = po.filter(o=>(o[C.STATUS]||'').trim()==='NEW ORDER').length;
+    const shipped= cnt - newOrd;
+    const del    = po.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+    const rto    = po.filter(o=>(o[C.STATUS]||'').trim()==='RTO DELIVERED').length;
+    const delAtt = po.filter(o=>parseInt(o[C.ATTEMPTS])>=1).length;
+    const fad    = po.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED'&&parseInt(o[C.ATTEMPTS])===1).length;
+    const codSum = po.reduce((s,o)=>{
+      if((o[C.PAYMENT]||'').toLowerCase().trim()==='cod'){const v=parseFloat(o[C.COD]);if(isFinite(v))return s+v;}
+      return s;
+    },0);
+    const aw     = po.filter(o=>parseInt(o[C.ATTEMPTS])>0);
+    const avgAtt = aw.length>0?aw.reduce((s,o)=>s+parseInt(o[C.ATTEMPTS]),0)/aw.length:0;
+    const delPct = shipped>0?del/shipped*100:0;
+    const rtoPct = shipped>0?rto/shipped*100:0;
+    const fadPct = delAtt>0?fad/delAtt*100:0;
+    return {name,sku,cnt,shipped,del,rto,fad,delAtt,codSum,avgAtt,delPct,rtoPct,fadPct};
+  });
+
+  showAllProds = false;
+  renderTable();
+}
+
+function sortBy(col) {
+  if (sortCol===col) sortAsc=!sortAsc;
+  else { sortCol=col; sortAsc=(col==='name'); }
+  document.querySelectorAll('#prodTable thead th').forEach(th=>{
+    th.classList.remove('sort-asc','sort-desc');
+    if (th.dataset.col===col) th.classList.add(sortAsc?'sort-asc':'sort-desc');
+  });
+  renderTable();
+}
+
+function toggleShowAll() {
+  showAllProds = !showAllProds;
+  renderTable();
+}
+
+function renderTable() {
+  const filtered = applyColFilter(tableData);
+  const sorted   = [...filtered].sort((a,b)=>{
+    const av=a[sortCol],bv=b[sortCol];
+    const cmp=typeof av==='string'?av.localeCompare(bv):av-bv;
+    return sortAsc?cmp:-cmp;
+  });
+
+  const total   = sorted.length;
+  const limit   = showAllProds ? total : Math.min(20, total);
+  const display = sorted.slice(0, limit);
+
+  document.getElementById('tableInfo').textContent =
+    filtered.length < tableData.length
+      ? `Showing ${display.length} of ${total} products (filtered)`
+      : `Showing ${display.length} of ${total} products`;
+
+  const tbody = document.getElementById('prodTbody');
+  if(!display.length){ tbody.innerHTML=`<tr><td colspan="11" class="nodata">No products match current filters</td></tr>`; }
+  else {
+    tbody.innerHTML = display.map((r,i)=>{
+      const dB=r.delPct>=60?'bg-g':r.delPct>=40?'bg-y':'bg-r';
+      const rB=r.rtoPct<=15?'bg-g':r.rtoPct<=30?'bg-y':'bg-r';
+      const fB=r.fadPct>=60?'bg-g':r.fadPct>=40?'bg-y':'bg-r';
+      return `<tr>
+        <td class="sr-col">${i+1}</td>
+        <td class="prod-cell">
+          <div class="prod-name">${esc(r.name)}</div>
+          ${r.sku?`<div class="prod-sku">${esc(r.sku)}</div>`:''}
+        </td>
+        <td><strong>${r.cnt}</strong></td>
+        <td>${r.shipped}</td>
+        <td>${r.del}</td>
+        <td><span class="badge ${dB}">${r.delPct.toFixed(1)}%</span></td>
+        <td>${r.rto}</td>
+        <td><span class="badge ${rB}">${r.rtoPct.toFixed(1)}%</span></td>
+        <td><span class="badge ${fB}">${r.delAtt>0?r.fadPct.toFixed(1)+'%':'—'}</span></td>
+        <td>${fmtINR(r.codSum)}</td>
+        <td>${r.avgAtt>0?r.avgAtt.toFixed(2):'—'}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Show All / Show Less button
+  const wrap = document.getElementById('showAllWrap');
+  const btn  = document.getElementById('btnShowAll');
+  if (total > 20) {
+    wrap.style.display = 'block';
+    btn.textContent = showAllProds ? `▲ Show Top 20 Only` : `▼ Show All ${total} Products`;
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+
+// ── TAT Section ──────────────────────────────────────────────────────
+function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
+  // Order → Pickup TAT
+  const opTATs = [];
+  orders.forEach(o=>{
+    const c=parseDate(o[C.CREATED]);
+    const p=parseDate(o[C.PICKED_UP]);
+    const d=diffDays(c,p);
+    if(d!=null && d>=0 && d<60) opTATs.push(d);
+  });
+  const avgOP = opTATs.length ? opTATs.reduce((s,v)=>s+v,0)/opTATs.length : null;
+
+  // Pickup → Delivery TAT & Order → Delivery TAT (only if deliveredDate col exists)
+  const pdTATs=[], odTATs=[];
+  if (detectedCols.deliveredDate) {
+    orders.forEach(o=>{
+      if((o[C.STATUS]||'').trim()!=='DELIVERED') return;
+      const c=parseDate(o[C.CREATED]);
+      const p=parseDate(o[C.PICKED_UP]);
+      const d=parseDate(o[detectedCols.deliveredDate]);
+      const pd=diffDays(p,d); if(pd!=null&&pd>=0&&pd<60) pdTATs.push(pd);
+      const od=diffDays(c,d); if(od!=null&&od>=0&&od<60) odTATs.push(od);
+    });
+  }
+  const avgPD = pdTATs.length ? pdTATs.reduce((s,v)=>s+v,0)/pdTATs.length : null;
+  const avgOD = odTATs.length ? odTATs.reduce((s,v)=>s+v,0)/odTATs.length : null;
+
+  // TAT KPI cards
+  const delPctStr = shipped>0 ? pct(DELIVERED,shipped) : '—';
+  const unfPctStr = pct(NEW_ORDER,total);
+  const badge     = (label, val) => `<span class="tat-del-badge">${label}: ${val}</span>`;
+
+  set('tatOP',  avgOP!=null ? avgOP.toFixed(1) : '—');
+  set('tatOPU', avgOP!=null ? 'days avg' : '');
+  set('tatOPSub', opTATs.length ? `Based on ${opTATs.length} picked-up orders` : 'No pickup data available');
+  setHTML('tatOPDel', badge('Delivery',delPctStr)+badge('Unfulfilled',unfPctStr));
+
+  set('tatPD',  avgPD!=null ? avgPD.toFixed(1) : '—');
+  set('tatPDU', avgPD!=null ? 'days avg' : '');
+  set('tatPDSub', pdTATs.length ? `Based on ${pdTATs.length} delivered orders` : detectedCols.deliveredDate?'Insufficient data':'Delivered Date column not found in CSV');
+  setHTML('tatPDDel', avgPD!=null ? badge('Delivery',delPctStr)+badge('Unfulfilled',unfPctStr) : '');
+
+  set('tatOD',  avgOD!=null ? avgOD.toFixed(1) : '—');
+  set('tatODU', avgOD!=null ? 'days avg' : '');
+  set('tatODSub', odTATs.length ? `Based on ${odTATs.length} delivered orders` : detectedCols.deliveredDate?'Insufficient data':'Delivered Date column not found in CSV');
+  setHTML('tatODDel', avgOD!=null ? badge('Delivery',delPctStr)+badge('Unfulfilled',unfPctStr) : '');
+
+  // Pickup TAT distribution
+  const buckets = [
+    {label:'Same Day (0)',min:0,max:0},
+    {label:'1 Day',min:1,max:1},
+    {label:'2 Days',min:2,max:2},
+    {label:'3 Days',min:3,max:3},
+    {label:'4-7 Days',min:4,max:7},
+    {label:'8+ Days',min:8,max:999},
+  ];
+  const bucketCounts = buckets.map(b=>opTATs.filter(d=>d>=b.min&&d<=b.max).length);
+  mkChart('cTatDist','bar',{
+    labels:buckets.map(b=>b.label),
+    datasets:[{
+      label:'Orders',data:bucketCounts,
+      backgroundColor:[VAR_PURPLE,'rgba(97,62,152,.75)','rgba(97,62,152,.6)','rgba(97,62,152,.45)','rgba(97,62,152,.3)','rgba(97,62,152,.2)'],
+      borderRadius:4
+    }]
+  },{plugins:{legend:{display:false}},scales:{x:{grid:{display:false}},y:{beginAtZero:true}}});
+
+  // Pickup TAT impact on delivery % (request 6)
+  const impactData = buckets.map(b=>{
+    const bOrders = orders.filter(o=>{
+      const c=parseDate(o[C.CREATED]);
+      const p=parseDate(o[C.PICKED_UP]);
+      const d=diffDays(c,p);
+      return d!=null&&d>=b.min&&d<=b.max;
+    });
+    const bShipped = bOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
+    const bDel     = bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+    return {count:bOrders.length, delPct: bShipped>0?(bDel/bShipped*100).toFixed(1):null};
+  });
+  mkChart('cTatImpact','bar',{
+    labels:buckets.map(b=>b.label),
+    datasets:[
+      {type:'bar',label:'Orders',data:impactData.map(d=>d.count),backgroundColor:'rgba(97,62,152,.4)',borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:impactData.map(d=>d.delPct),borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
+    ]
+  },{
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+}
+
+// ── Business & Advertiser Insights ───────────────────────────────────
+function renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total) {
+  if (!orders.length) return;
+
+  // COD vs Prepaid split
+  const codOrders     = orders.filter(o=>(o[C.PAYMENT]||'').toLowerCase().trim()==='cod');
+  const prepaidOrders = orders.filter(o=>(o[C.PAYMENT]||'').toLowerCase().trim()!=='cod');
+  const codShipped    = codOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
+  const prepShipped   = prepaidOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
+  const codDel        = codOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const prepDel       = prepaidOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const codDelPct     = codShipped>0?(codDel/codShipped*100).toFixed(1):null;
+  const prepDelPct    = prepShipped>0?(prepDel/prepShipped*100).toFixed(1):null;
+  const codPct        = total>0?(codOrders.length/total*100).toFixed(0):0;
+
+  set('iCodPct', codPct+'% COD');
+  set('iCodSub', `${codOrders.length} COD · ${prepaidOrders.length} Prepaid orders`);
+  setHTML('iCodNote', `COD delivery: <strong>${codDelPct!=null?codDelPct+'%':'—'}</strong> · Prepaid: <strong>${prepDelPct!=null?prepDelPct+'%':'—'}</strong>`);
+
+  // NDR Recovery: of orders with attempt ≥ 2, how many delivered?
+  const ndrOrders     = orders.filter(o=>parseInt(o[C.ATTEMPTS])>=2);
+  const ndrDelivered  = ndrOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const ndrRecovery   = ndrOrders.length>0?(ndrDelivered/ndrOrders.length*100).toFixed(1):null;
+  set('iNDR',    ndrRecovery!=null ? ndrRecovery+'%' : '—');
+  set('iNDRSub', `${ndrDelivered} recovered of ${ndrOrders.length} NDR orders`);
+  setHTML('iNDRNote', ndrOrders.length ? `${100-parseFloat(ndrRecovery||0)}% of multi-attempt orders went to RTO — renegotiate NDR rules` : 'No NDR data available');
+
+  // Revenue at Risk
+  let rtoRisk=0, rtoCnt=0;
+  orders.forEach(o=>{
+    if((o[C.STATUS]||'').trim()==='RTO DELIVERED'&&(o[C.PAYMENT]||'').toLowerCase().trim()==='cod'){
+      const v=parseFloat(o[C.COD]); if(isFinite(v)&&v>0){rtoRisk+=v;rtoCnt++;}
+    }
+  });
+  set('iRAR',    fmtINR(rtoRisk));
+  set('iRARSub', `${rtoCnt} COD orders returned`);
+  const totalCodVal = orders.reduce((s,o)=>{if((o[C.PAYMENT]||'').toLowerCase().trim()==='cod'){const v=parseFloat(o[C.COD]);if(isFinite(v)&&v>0)return s+v;}return s;},0);
+  const riskPct = totalCodVal>0?(rtoRisk/totalCodVal*100).toFixed(1):null;
+  setHTML('iRARNote', riskPct!=null ? `${riskPct}% of total COD value (${fmtINR(totalCodVal)}) lost to RTO` : 'No COD RTO data');
+
+  // Re-attempt efficiency: success rate per attempt number (2nd, 3rd attempt deliveries)
+  const att2orders = orders.filter(o=>parseInt(o[C.ATTEMPTS])>=2);
+  const att3orders = orders.filter(o=>parseInt(o[C.ATTEMPTS])>=3);
+  const att4orders = orders.filter(o=>parseInt(o[C.ATTEMPTS])>=4);
+  const att2del = att2orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const att3del = att3orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const att4del = att4orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+  const rRow = (num,cnt,del) => cnt>0 ? `<div class="ratt-row"><div class="ratt-num">${num}</div><span class="ratt-label">Attempt ${num} success</span><span class="ratt-val">${(del/cnt*100).toFixed(0)}%</span></div>` : '';
+  setHTML('iReattempt',
+    `<div class="ic-label" style="margin-bottom:6px">Re-attempt Success Rate</div>`+
+    rRow(2,att2orders.length,att2del)+
+    rRow(3,att3orders.length,att3del)+
+    (att4orders.length ? rRow(4,att4orders.length,att4del) : '')
+  );
+
+  // COD vs Prepaid chart
+  const codRTO   = codOrders.filter(o=>(o[C.STATUS]||'').trim()==='RTO DELIVERED').length;
+  const prepRTO  = prepaidOrders.filter(o=>(o[C.STATUS]||'').trim()==='RTO DELIVERED').length;
+  const codRTOPct  = codShipped>0?(codRTO/codShipped*100).toFixed(1):0;
+  const prepRTOPct = prepShipped>0?(prepRTO/prepShipped*100).toFixed(1):0;
+  mkChart('cPayment','bar',{
+    labels:['COD','Prepaid'],
+    datasets:[
+      {label:'Delivery %',data:[codDelPct||0,prepDelPct||0],backgroundColor:['rgba(97,62,152,.7)','rgba(97,62,152,.35)'],borderRadius:5,yAxisID:'y'},
+      {label:'RTO %',data:[codRTOPct,prepRTOPct],backgroundColor:['rgba(198,40,40,.7)','rgba(198,40,40,.35)'],borderRadius:5,yAxisID:'y'}
+    ]
+  },{plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},scales:{x:{grid:{display:false}},y:{beginAtZero:true,max:100,ticks:{callback:v=>v+'%'}}}});
+
+  // Day of week pattern
+  const DOW=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const dowData=DOW.map(()=>({total:0,del:0,newOrd:0}));
+  orders.forEach(o=>{
+    const d=parseDate(o[C.CREATED]);
+    if(!d) return;
+    const di=d.getDay();
+    dowData[di].total++;
+    if((o[C.STATUS]||'').trim()==='DELIVERED') dowData[di].del++;
+    if((o[C.STATUS]||'').trim()==='NEW ORDER') dowData[di].newOrd++;
+  });
+  const dowTotals = dowData.map(d=>d.total);
+  const dowPcts   = dowData.map(d=>{const s=d.total-d.newOrd;return s>0?(d.del/s*100).toFixed(1):0;});
+  mkChart('cWeekday','bar',{
+    labels:DOW,
+    datasets:[
+      {type:'bar',label:'Orders',data:dowTotals,backgroundColor:'rgba(97,62,152,.5)',borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:dowPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7}
+    ]
+  },{
+    plugins:{legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}}},
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:11}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:0,max:100,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+}
+</script>
+</body>
+</html>
