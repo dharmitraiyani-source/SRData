@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mumma Mall – Delivery Analytics</title>
+<title>SR Data Analysis by DP – Delivery Analytics</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
@@ -143,6 +143,7 @@ body{font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .cc{background:#fff;border-radius:14px;padding:16px 18px;box-shadow:0 2px 8px rgba(97,62,152,.07);border:1px solid var(--border)}
 .cc h3{font-size:12.5px;font-weight:800;color:var(--purple-d);margin-bottom:13px}
 .chart-wrap{position:relative;height:260px}
+.chart-wrap-trend{position:relative;height:340px}
 .chart-wrap-t{position:relative;height:310px}
 .nodata-chart{display:flex;align-items:center;justify-content:center;height:260px;font-size:13px;color:var(--text3);font-style:italic;text-align:center}
 
@@ -229,21 +230,51 @@ tbody tr:hover td{background:#faf8ff}
 .ratt-label{font-size:12px;color:var(--text2);flex:1}
 .ratt-val{font-size:13px;font-weight:900;color:var(--purple-d)}
 
-/* ── Status Chart Controls ── */
-.status-ctl{display:flex;gap:8px;align-items:center;margin:0 0 10px;flex-wrap:wrap}
+/* ── Status Chart Layout ── */
+.status-cc{display:flex;flex-direction:column}
+.status-layout{display:flex;gap:10px;flex:1;min-height:340px}
+.status-left{width:180px;flex-shrink:0;display:flex;flex-direction:column;gap:0}
+.status-chart-area{flex:1;position:relative}
+.status-legend{flex:1;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:1px;min-height:0}
+.sli{display:flex;align-items:center;gap:5px;padding:3px 6px;border-radius:4px;cursor:pointer;transition:background .1s;user-select:none}
+.sli:hover{background:var(--purple-l)}
+.sli.sli-hidden{opacity:.35}
+.sli-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0}
+.sli-name{font-size:9.5px;flex:1;color:var(--text);line-height:1.2;word-break:break-word}
+.sli-pct{font-size:9.5px;font-weight:800;color:var(--purple-d);flex-shrink:0;min-width:32px;text-align:right}
+.status-ctl{display:flex;gap:6px;align-items:flex-start;flex-direction:column;margin:0 0 0}
 .stu-btn{padding:4px 11px;border:1.5px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-size:11px;font-weight:700;color:var(--text2);font-family:inherit;transition:all .15s;white-space:nowrap}
 .stu-btn:hover{border-color:var(--purple);background:var(--purple-l);color:var(--purple)}
 .stu-btn.active{border-color:var(--purple);background:var(--purple-l);color:var(--purple)}
 .stu-dd-wrap{position:relative}
-.status-dd{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1.5px solid var(--purple-mid);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:210px;max-height:280px;overflow:hidden;flex-direction:column}
+.status-dd{display:none;position:absolute;top:calc(100% + 4px);left:0;z-index:200;background:#fff;border:1.5px solid var(--purple-mid);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.15);min-width:220px;max-height:340px;overflow:hidden;flex-direction:column}
 .status-dd.open{display:flex}
-.status-dd-opts{flex:1;overflow-y:auto;padding:8px 10px;display:flex;flex-direction:column;gap:1px}
+.status-dd-search{padding:8px 10px 6px;border-bottom:1px solid var(--purple-l);flex-shrink:0}
+.status-dd-search input{width:100%;padding:5px 9px;border:1.5px solid var(--border);border-radius:6px;font-size:11.5px;color:var(--text);font-family:inherit;background:#fff}
+.status-dd-search input:focus{outline:none;border-color:var(--purple)}
+.status-dd-opts{flex:1;overflow-y:auto;padding:6px 10px;display:flex;flex-direction:column;gap:1px}
 .status-dd-opts label{display:flex;align-items:center;gap:7px;padding:5px 7px;border-radius:5px;cursor:pointer;font-size:11px;white-space:nowrap}
 .status-dd-opts label:hover{background:var(--purple-l)}
+.status-dd-opts label.hidden{display:none}
 .status-dd-opts input[type=checkbox]{accent-color:var(--purple);flex-shrink:0}
-.status-dd-foot{padding:6px 10px;border-top:1px solid var(--purple-l);background:#faf8ff}
-.status-dd-foot button{font-size:11px;font-weight:700;color:var(--purple);background:none;border:none;cursor:pointer;font-family:inherit;padding:0}
-.status-dd-foot button:hover{text-decoration:underline}
+.status-dd-foot{padding:6px 10px;border-top:1px solid var(--purple-l);background:#faf8ff;display:flex;gap:8px}
+.status-dd-foot button{flex:1;font-size:11px;font-weight:700;color:var(--purple);background:var(--purple-l);border:1px solid var(--border);border-radius:5px;cursor:pointer;font-family:inherit;padding:4px 0;transition:background .15s}
+.status-dd-foot button:hover{background:#ddd5f5}
+
+/* ── Quick Date Buttons ── */
+.quick-btns{display:flex;gap:3px;flex-wrap:wrap;align-items:center}
+.qbtn{padding:3px 8px;border:1.5px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:10.5px;font-weight:700;color:var(--text2);font-family:inherit;transition:all .12s;white-space:nowrap}
+.qbtn:hover{border-color:var(--purple);background:var(--purple-l);color:var(--purple)}
+.qbtn.excl{color:#B71C1C;border-color:#FFCDD2;background:#fff8f8}
+.qbtn.excl:hover{background:#FFCDD2;border-color:#B71C1C}
+.qrange-sel{padding:4px 8px;border:1.5px solid var(--border);border-radius:5px;background:#fff;cursor:pointer;font-size:10.5px;font-weight:700;color:var(--text2);font-family:inherit;height:26px;outline:none;transition:border-color .12s}
+.qrange-sel:focus{border-color:var(--purple)}
+.btn-dl{padding:5px 12px;border:none;border-radius:7px;background:var(--purple);color:#fff;cursor:pointer;font-size:11.5px;font-weight:800;font-family:inherit;transition:opacity .15s;margin-left:auto}
+.btn-dl:hover{opacity:.85}
+.mini-dl{position:absolute;top:9px;right:9px;padding:2px 6px;border:1px solid rgba(97,62,152,.25);border-radius:4px;background:rgba(255,255,255,.85);color:var(--purple);cursor:pointer;font-size:10px;opacity:.55;font-family:inherit;line-height:1.4;transition:opacity .15s}
+.mini-dl:hover{opacity:1;background:var(--purple-l);border-color:var(--purple)}
+.mini-dl-tbl{padding:2px 6px;border:1px solid rgba(97,62,152,.2);border-radius:4px;background:#faf8ff;color:var(--purple);cursor:pointer;font-size:10px;font-family:inherit;line-height:1.4;transition:all .12s}
+.mini-dl-tbl:hover{background:var(--purple-l);border-color:var(--purple);opacity:1}
 
 /* ── Courier Analysis ── */
 .courier-table-wrap{overflow-x:auto;margin-bottom:13px;border-radius:12px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(97,62,152,.07)}
@@ -268,8 +299,8 @@ tbody tr:hover td{background:#faf8ff}
   <div class="hdr-brand">
     <div class="hdr-logo">MM</div>
     <div class="hdr-text">
-      <h1>Mumma Mall</h1>
-      <p id="hdrSub">Delivery Analytics · Upload your Shiprocket export to begin</p>
+      <h1>SR Data Analysis by DP</h1>
+      <p id="hdrSub">v21 (16-6-26) · Upload your Shiprocket export to begin</p>
     </div>
   </div>
   <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
@@ -293,6 +324,30 @@ tbody tr:hover td{background:#faf8ff}
   <div class="fbar">
     <div class="fg"><label>From Date</label><input type="date" id="fFrom"></div>
     <div class="fg"><label>To Date</label><input type="date" id="fTo"></div>
+    <div class="fg" style="gap:3px">
+      <label>Quick Range</label>
+      <select class="qrange-sel" onchange="applyQuickRange(this.value);this.value=''">
+        <option value="">— Select —</option>
+        <option value="yesterday">Yesterday</option>
+        <option value="3">Last 3 Days</option>
+        <option value="7">Last 7 Days</option>
+        <option value="14">Last 14 Days</option>
+        <option value="30">Last 30 Days</option>
+        <option value="60">Last 60 Days</option>
+        <option value="90">Last 90 Days</option>
+        <option value="180">Last 6 Months</option>
+        <option value="all">All Time</option>
+      </select>
+    </div>
+    <div class="fg" style="gap:3px">
+      <label>Exclude Recent</label>
+      <div class="quick-btns">
+        <button class="qbtn excl" onclick="excludeLastDays(7)" title="Set end date to 7 days ago">−7d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(9)" title="Set end date to 9 days ago">−9d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(11)" title="Set end date to 11 days ago">−11d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(14)" title="Set end date to 14 days ago">−14d</button>
+      </div>
+    </div>
 
     <div class="ms-wrap" id="msWrap">
       <label>Products</label>
@@ -312,11 +367,6 @@ tbody tr:hover td{background:#faf8ff}
       </div>
     </div>
 
-    <div class="fg"><label>COD Min (₹)</label><input type="number" id="fCodMin" placeholder="Any" style="min-width:90px"></div>
-    <div class="fg"><label>COD Max (₹)</label><input type="number" id="fCodMax" placeholder="Any" style="min-width:90px"></div>
-    <div class="fg"><label>Attempts ≥</label><input type="number" id="fAttMin" placeholder="Any" min="0" style="min-width:78px"></div>
-    <div class="fg"><label>Attempts ≤</label><input type="number" id="fAttMax" placeholder="Any" min="0" style="min-width:78px"></div>
-
     <div class="upsell-toggle active" id="upsellToggle" onclick="toggleUpsell()">
       <div class="toggle-dot" id="toggleDot"></div>
       <span id="upsellLabel">Hide Upsell Items</span>
@@ -324,6 +374,7 @@ tbody tr:hover td{background:#faf8ff}
 
     <button class="btn-rst" onclick="resetFilters()">↺ Reset</button>
     <span class="rcount" id="rcount"></span>
+    <button class="btn-dl" onclick="downloadData()">⬇ Download</button>
   </div>
 
   <!-- ===== SECTION: OVERVIEW ===== -->
@@ -336,6 +387,7 @@ tbody tr:hover td{background:#faf8ff}
   <!-- KPIs -->
   <div class="kgrid">
     <div class="kpi k-green">
+      <button class="mini-dl" onclick="downloadKPI('del')" title="Download Delivered orders">⬇</button>
       <span class="kpi-ico">✅</span>
       <div class="kpi-lbl">Delivery %</div>
       <div class="kpi-val" id="kDel">—</div>
@@ -343,6 +395,7 @@ tbody tr:hover td{background:#faf8ff}
       <div class="kpi-note">of shipped orders</div>
     </div>
     <div class="kpi k-orange">
+      <button class="mini-dl" onclick="downloadKPI('unf')" title="Download Unfulfilled orders">⬇</button>
       <span class="kpi-ico">⏳</span>
       <div class="kpi-lbl">Unfulfilled %</div>
       <div class="kpi-val" id="kUnf">—</div>
@@ -350,6 +403,7 @@ tbody tr:hover td{background:#faf8ff}
       <div class="kpi-note">of all orders</div>
     </div>
     <div class="kpi k-purple">
+      <button class="mini-dl" onclick="downloadKPI('fad')" title="Download 1st Attempt Delivered orders">⬇</button>
       <span class="kpi-ico">🎯</span>
       <div class="kpi-lbl">1st Attempt Delivery %</div>
       <div class="kpi-val" id="kFAD">—</div>
@@ -357,6 +411,7 @@ tbody tr:hover td{background:#faf8ff}
       <div class="kpi-note">of delivery-attempted orders</div>
     </div>
     <div class="kpi k-red">
+      <button class="mini-dl" onclick="downloadKPI('np')" title="Download Non-Pickup orders">⬇</button>
       <span class="kpi-ico">🚫</span>
       <div class="kpi-lbl">Non-Pickup Orders</div>
       <div class="kpi-val" id="kNP">—</div>
@@ -376,21 +431,32 @@ tbody tr:hover td{background:#faf8ff}
 
   <!-- Charts Row 1: Status + Trend (smooth line) -->
   <div class="cgrid">
-    <div class="cc">
+    <div class="cc status-cc">
       <h3>📊 Order Status Distribution</h3>
-      <div class="status-ctl">
-        <button class="stu-btn" id="btnHideUnf" onclick="toggleHideUnf()">Hide Unfulfilled</button>
-        <div class="stu-dd-wrap">
-          <button class="stu-btn" id="btnStatusFilter" onclick="toggleStatusDd(event)">All Statuses ▾</button>
-          <div class="status-dd" id="statusDd">
-            <div class="status-dd-opts" id="statusDdOpts"></div>
-            <div class="status-dd-foot"><button onclick="clearStatusFilter()">Show All Statuses</button></div>
+      <div class="status-layout">
+        <div class="status-left">
+          <div class="status-ctl">
+            <button class="stu-btn" id="btnHideUnf" onclick="toggleHideUnf()">Hide Unfulfilled</button>
+            <div class="stu-dd-wrap">
+              <button class="stu-btn" id="btnStatusFilter" onclick="toggleStatusDd(event)">All Statuses ▾</button>
+              <div class="status-dd" id="statusDd">
+                <div class="status-dd-search">
+                  <input type="text" placeholder="Search status…" autocomplete="off" oninput="filterStatusDd(this.value)">
+                </div>
+                <div class="status-dd-opts" id="statusDdOpts"></div>
+                <div class="status-dd-foot">
+                  <button onclick="selectAllStatuses()">✓ Select All</button>
+                  <button onclick="clearStatusFilter()">↺ Show All</button>
+                </div>
+              </div>
+            </div>
           </div>
+          <div class="status-legend" id="statusLegend"></div>
         </div>
+        <div class="status-chart-area"><canvas id="cStatus"></canvas></div>
       </div>
-      <div class="chart-wrap"><canvas id="cStatus"></canvas></div>
     </div>
-    <div class="cc"><h3>📈 Daily Orders Trend</h3><div class="chart-wrap"><canvas id="cTrend"></canvas></div></div>
+    <div class="cc"><h3>📈 Daily Orders Trend</h3><div class="chart-wrap-trend"><canvas id="cTrend"></canvas></div></div>
   </div>
 
   <!-- Charts Row 2: State + City Tier -->
@@ -470,9 +536,10 @@ tbody tr:hover td{background:#faf8ff}
             <button class="th-filter-btn" onclick="openFP(event,'postFADPct')" title="Filter">⊟</button>
             <div class="fp" id="fp-postFADPct"><div class="fp-title">Post-FAD Boost % range</div><div class="fp-row"><input type="number" id="fi-postFADPct-min" placeholder="Min %" oninput="setCFR('postFADPct','min',this.value)"><span>–</span><input type="number" id="fi-postFADPct-max" placeholder="Max %" oninput="setCFR('postFADPct','max',this.value)"></div><button class="fp-clear" onclick="clearCFR('postFADPct')">Clear</button></div>
           </th>
+          <th style="min-width:36px;text-align:center"><div class="th-inner" style="justify-content:center">DL</div></th>
         </tr>
       </thead>
-      <tbody id="prodTbody"><tr><td colspan="12" class="nodata">Upload a CSV to see data</td></tr></tbody>
+      <tbody id="prodTbody"><tr><td colspan="13" class="nodata">Upload a CSV to see data</td></tr></tbody>
     </table>
     <div class="show-all-wrap" id="showAllWrap">
       <button class="btn-show-all" id="btnShowAll" onclick="toggleShowAll()">Show All Products</button>
@@ -576,6 +643,23 @@ tbody tr:hover td{background:#faf8ff}
     <p style="padding:24px;text-align:center;color:var(--text3);font-weight:600">Upload a CSV to see courier analysis</p>
   </div>
 
+  <!-- ===== SECTION: ADDRESS SCORE ===== -->
+  <div class="sec-div" id="addrScoreSec" style="display:none">
+    <h2>📍 Address Score Analysis</h2>
+    <div class="sd-line"></div>
+    <span class="sec-tag">Quality</span>
+  </div>
+  <div class="cgrid" id="addrScoreCharts" style="display:none">
+    <div class="cc">
+      <h3>📅 Avg Address Score by Date</h3>
+      <div class="chart-wrap"><canvas id="cAddrDate"></canvas></div>
+    </div>
+    <div class="cc">
+      <h3>📊 Orders by Address Score Zone</h3>
+      <div class="chart-wrap"><canvas id="cAddrZone"></canvas></div>
+    </div>
+  </div>
+
 </section>
 
 <script>
@@ -590,9 +674,18 @@ let selectedProds = new Set();
 let hideUpsell    = true;
 let showAllProds  = false;
 let detectedCols  = { state: null, city: null, deliveredDate: null, courier: null };
-let hideUnfulfilled  = false;
-let statusFilterSet  = new Set();
-let lastStatusCounts = {};
+let hideUnfulfilled   = false;
+let statusExcludeSet  = new Set(); // statuses to HIDE from chart (checked = visible)
+let lastStatusCounts  = {};
+let currentOrders     = [];
+let statusSorted      = []; // captured sorted entries for custom legend re-use
+let kpiOrders         = {del:[],unf:[],fad:[],np:[]};
+let trendOrdersByDay  = {};  // date string → [order IDs]
+let stateOrderIds     = {};  // state string → [order IDs]
+let tierOrderIds      = {};  // tier string → [order IDs]
+let pickupBktIds      = [];  // array per bucket → [order IDs]
+let addrZoneIds       = [];  // array per score zone → [order IDs]
+let prodDownloadIds   = {};  // product name → [order IDs]
 
 // ── Column filter state ─────────────────────────────────────────────
 const CF = {
@@ -653,12 +746,62 @@ const TIER2 = new Set([
   'bhavnagar','moradabad','anand','loni','modinagar','hapur','muzaffarnagar',
   'nellore','eluru','kakinada','rajahmundry','vizianagaram','hubli-dharwad'
 ]);
+// Tier 3 — District HQs and medium towns (100k–500k pop), not already in Tier 1/2
+const TIER3 = new Set([
+  // Haryana
+  'karnal','ambala','rohtak','hisar','panipat','sonipat','yamunanagar','rewari','palwal','jhajjar','kurukshetra','sirsa',
+  // Punjab
+  'bathinda','firozpur','hoshiarpur','moga','muktsar','fazilka','pathankot','kapurthala',
+  // UP (medium towns)
+  'bareilly','mathura','vrindavan','shahjahanpur','rampur','budaun','sitapur','hardoi','unnao',
+  'jaunpur','azamgarh','mau','ballia','deoria','basti','sultanpur','ayodhya','faizabad',
+  'etawah','mainpuri','etah','hathras','bulandshahr','sambhal','amroha','muzaffarnagar',
+  // MP (medium)
+  'sagar','rewa','satna','chhindwara','singrauli','katni','burhanpur','khandwa','khargone',
+  'shivpuri','guna','morena','bhind','mandsaur','neemuch','ratlam','dewas','hoshangabad','itarsi',
+  // Rajasthan (medium)
+  'bharatpur','alwar','pali','barmer','sikar','bhilwara','churu','sri ganganagar',
+  'hanumangarh','tonk','bundi','baran','jhalawar','sawai madhopur','chittorgarh',
+  // Bihar (medium)
+  'muzaffarpur','darbhanga','chapra','ara','buxar','sasaram','bettiah','motihari',
+  'sitamarhi','purnia','katihar','araria','kishanganj','begusarai','munger','khagaria',
+  // Chhattisgarh
+  'bilaspur','korba','jagdalpur','ambikapur','rajnandgaon','mahasamund',
+  // Odisha
+  'sambalpur','berhampur','balasore','baripada','jharsuguda','bargarh','koraput',
+  // West Bengal (medium)
+  'bardhaman','burdwan','krishnanagar','jalpaiguri','alipurduar','cooch behar','malda','murshidabad','berhampore',
+  // Assam
+  'dibrugarh','silchar','tezpur','jorhat','nagaon','dhubri','lakhimpur',
+  // Himachal Pradesh
+  'shimla','solan','baddi','mandi','dharamshala','palampur','sirmour',
+  // Uttarakhand
+  'haridwar','roorkee','haldwani','rudrapur','kashipur','rishikesh','ramnagar',
+  // J&K
+  'jammu','baramulla','anantnag','sopore',
+  // Karnataka (medium)
+  'tumkur','tumakuru','shimoga','shivamogga','hassan','chitradurga','bidar','raichur','kolar','mandya','chikmagalur','bagalkot',
+  // Tamil Nadu (medium)
+  'vellore','tirupur','tiruppur','cuddalore','thanjavur','tanjore','tiruvallur','sivakasi',
+  'dindigul','karur','namakkal','dharmapuri','hosur','kumbakonam','ariyalur',
+  // AP/Telangana (medium)
+  'karimnagar','nizamabad','khammam','siddipet','adilabad','kurnool','nandyal','ongole',
+  // Maharashtra (medium)
+  'latur','osmanabad','yavatmal','beed','ahmednagar','satara','dhule','buldhana','akola','washim',
+  // Gujarat (medium)
+  'gandhinagar','navsari','valsad','junagadh','amreli','botad','morbi','surendranagar','porbandar',
+  // Jharkhand
+  'bokaro','deoghar','giridih','hazaribagh','ramgarh','chaibasa',
+  // Kerala
+  'thrissur','trichur','palakkad','malappuram','kannur','kasaragod','kollam','kottayam','alappuzha','alappuzha',
+]);
 const getCityTier = city => {
   if (!city) return 'Unknown';
   const c = city.toLowerCase().trim().replace(/\s+/g,' ');
   if (TIER1.has(c)) return 'Tier 1';
   if (TIER2.has(c)) return 'Tier 2';
-  return 'Tier 3';
+  if (TIER3.has(c)) return 'Tier 3';
+  return 'Tier 4';
 };
 
 // ── Utils ───────────────────────────────────────────────────────────
@@ -686,6 +829,7 @@ function detectColumns(headers) {
     city         : find(['city']),
     deliveredDate: find(['delivered','date']) || find(['delivery','date']),
     courier      : headers.find((_,i) => lower[i].includes('courier')) || null,
+    addrScore    : find(['address','score']) || find(['pincode','score']) || headers.find((_,i) => lower[i]==='score') || null,
   };
 }
 
@@ -895,8 +1039,7 @@ function applyColFilter(data) {
 // ── Main Filters ────────────────────────────────────────────────────
 function getF() {
   const v=id=>document.getElementById(id).value;
-  const n=id=>{const r=parseFloat(document.getElementById(id).value);return isNaN(r)?null:r;};
-  return {from:v('fFrom'),to:v('fTo'),codMin:n('fCodMin'),codMax:n('fCodMax'),attMin:n('fAttMin'),attMax:n('fAttMax')};
+  return {from:v('fFrom'),to:v('fTo')};
 }
 
 function applyFilters() {
@@ -919,26 +1062,113 @@ function applyFilters() {
   if (f.from) { const d=new Date(f.from); orders=orders.filter(o=>{const x=parseDate(o[C.CREATED]);return x&&x>=d;}); }
   if (f.to)   { const d=new Date(f.to+'T23:59:59'); orders=orders.filter(o=>{const x=parseDate(o[C.CREATED]);return x&&x<=d;}); }
 
-  // COD amount
-  if (f.codMin!=null) orders=orders.filter(o=>{const v=parseFloat(o[C.COD]);return isFinite(v)&&v>=f.codMin;});
-  if (f.codMax!=null) orders=orders.filter(o=>{const v=parseFloat(o[C.COD]);return isFinite(v)&&v<=f.codMax;});
-
-  // Attempts
-  if (f.attMin!=null) orders=orders.filter(o=>{const v=parseInt(o[C.ATTEMPTS]);return !isNaN(v)&&v>=f.attMin;});
-  if (f.attMax!=null) orders=orders.filter(o=>{const v=parseInt(o[C.ATTEMPTS]);return !isNaN(v)&&v<=f.attMax;});
-
+  currentOrders = orders;
   render(orders);
 }
 
-let dbt;
-['fCodMin','fCodMax','fAttMin','fAttMax'].forEach(id =>
-  document.getElementById(id).addEventListener('input',()=>{clearTimeout(dbt);dbt=setTimeout(applyFilters,380);})
-);
 ['fFrom','fTo'].forEach(id => document.getElementById(id).addEventListener('change',applyFilters));
 
 function resetFilters() {
-  ['fFrom','fTo','fCodMin','fCodMax','fAttMin','fAttMax'].forEach(id=>document.getElementById(id).value='');
+  ['fFrom','fTo'].forEach(id=>document.getElementById(id).value='');
   clearMS();
+}
+
+// ── Download ─────────────────────────────────────────────────────────
+function openDownloadTab(rows, label) {
+  if (!rows.length) { alert('No data for: ' + label); return; }
+  const headers = Object.keys(rows[0]);
+  const esc2 = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const tdStyle = 'style="padding:4px 8px;border:1px solid #ddd;white-space:nowrap;font-size:12px;vertical-align:top"';
+  const thStyle = 'style="padding:5px 8px;border:1px solid #ccc;background:#f3f0ff;font-size:11px;font-weight:800;color:#613e98;cursor:pointer;white-space:nowrap;position:sticky;top:40px;z-index:1"';
+  const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc2(label)}</title>
+<style>
+*{box-sizing:border-box;font-family:system-ui,sans-serif}
+body{margin:0;padding:12px;background:#faf8ff}
+h2{font-size:14px;color:#613e98;margin:0 0 8px}
+.toolbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
+.toolbar input{padding:4px 8px;border:1.5px solid #c9b8f0;border-radius:5px;font-size:12px;outline:none}
+.toolbar input:focus{border-color:#613e98}
+.tbl-wrap{overflow:auto;max-height:calc(100vh - 100px);border-radius:8px;border:1px solid #ddd;box-shadow:0 2px 8px rgba(97,62,152,.1)}
+table{border-collapse:collapse;width:max-content}
+thead tr:first-child th{position:sticky;top:0;z-index:2;background:#f3f0ff}
+.filter-row input{width:100%;padding:2px 5px;border:1px solid #ddd;font-size:11px;border-radius:3px;outline:none}
+.filter-row input:focus{border-color:#613e98}
+.count{font-size:11px;color:#888;margin-left:auto}
+</style></head><body>
+<h2>${esc2(label)} — ${rows.length.toLocaleString()} rows</h2>
+<div class="toolbar">
+  <input type="text" id="gsearch" placeholder="🔍 Search all columns…" oninput="filterRows()" style="min-width:220px">
+  <span class="count" id="cnt"></span>
+</div>
+<div class="tbl-wrap">
+<table id="dt">
+<thead>
+<tr>${headers.map(h=>`<th ${thStyle} onclick="sortCol(this,'${esc2(h)}')" title="Sort by ${esc2(h)}">${esc2(h)} <span class="sort-ind"></span></th>`).join('')}</tr>
+<tr class="filter-row">${headers.map((_,i)=>`<td style="padding:3px 4px;border:1px solid #ddd;background:#faf8ff;position:sticky;top:40px"><input data-col="${i}" oninput="filterRows()" placeholder="filter…"></td>`).join('')}</tr>
+</thead>
+<tbody id="tbody">${rows.map(r=>`<tr>${headers.map(h=>`<td ${tdStyle}>${esc2(r[h])}</td>`).join('')}</tr>`).join('')}</tbody>
+</table>
+</div>
+<script>
+const allRows=${JSON.stringify(rows.map(r=>headers.map(h=>String(r[h]??''))))};
+let sortState={col:-1,asc:true};
+function getFiltered(){
+  const g=document.getElementById('gsearch').value.toLowerCase().trim();
+  const colFilters=Array.from(document.querySelectorAll('.filter-row input')).map(i=>i.value.toLowerCase().trim());
+  return allRows.filter(row=>{
+    if(g&&!row.some(c=>c.toLowerCase().includes(g))) return false;
+    for(let i=0;i<colFilters.length;i++){if(colFilters[i]&&!row[i].toLowerCase().includes(colFilters[i])) return false;}
+    return true;
+  });
+}
+function renderBody(rows){
+  document.getElementById('tbody').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td ${tdStyle}>'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td>').join('')+'</tr>').join('');
+  document.getElementById('cnt').textContent=rows.length.toLocaleString()+' of ${rows.length.toLocaleString()} rows';
+}
+function filterRows(){
+  const f=getFiltered();
+  if(sortState.col>=0){
+    const sc=sortState.col,asc=sortState.asc;
+    f.sort((a,b)=>asc?a[sc].localeCompare(b[sc],undefined,{numeric:true}):b[sc].localeCompare(a[sc],undefined,{numeric:true}));
+  }
+  renderBody(f);
+}
+function sortCol(th,_col){
+  const idx=Array.from(th.parentNode.children).indexOf(th);
+  if(sortState.col===idx)sortState.asc=!sortState.asc;
+  else{sortState.col=idx;sortState.asc=true;}
+  document.querySelectorAll('thead tr:first-child th .sort-ind').forEach((s,i)=>s.textContent=i===idx?(sortState.asc?' ▲':' ▼'):'');
+  filterRows();
+}
+filterRows();
+<\/script></body></html>`;
+  const win = window.open('', '_blank');
+  if (win) { win.document.write(html); win.document.close(); }
+  else alert('Pop-up blocked. Please allow pop-ups for this site.');
+}
+
+function downloadData() {
+  if (!currentOrders.length) { alert('No data to export. Upload a CSV and apply filters first.'); return; }
+  const filterIds = new Set(currentOrders.map(o=>(o[C.ORDER_ID]||'').trim()));
+  const rows = rawRows.filter(r => filterIds.has((r[C.ORDER_ID]||'').trim()));
+  openDownloadTab(rows, 'Shiprocket Export');
+}
+
+function downloadSubset(orderIdsArr, label) {
+  const ids = new Set(orderIdsArr.map(id=>String(id).trim()).filter(Boolean));
+  const rows = rawRows.filter(r => ids.has((r[C.ORDER_ID]||'').trim()));
+  openDownloadTab(rows, label);
+}
+
+function downloadKPI(type) {
+  const ids = kpiOrders[type] || [];
+  const labels = {del:'Delivered Orders',unf:'Unfulfilled (New) Orders',fad:'1st Attempt Delivered',np:'Non-Pickup Orders'};
+  downloadSubset(ids, labels[type] || type);
+}
+
+function downloadProductOrders(name) {
+  const ids = prodDownloadIds[name] || [];
+  downloadSubset(ids, 'Product: ' + name);
 }
 
 // ── Render ──────────────────────────────────────────────────────────
@@ -959,10 +1189,16 @@ function render(orders) {
 
   // Non-pickup
   const PENDING_ST = new Set(['NEW ORDER','PICKUP SCHEDULED','OUT FOR PICKUP','CANCELED','CANCELLATION REQUESTED','SELF FULFILED']);
-  const nonPickup  = orders.filter(o=>{
-    const st=(o[C.STATUS]||'').trim();
-    return st==='PICKUP EXCEPTION'||(!isNA(o[C.PICKUP_SCH])&&isNA(o[C.PICKED_UP])&&!PENDING_ST.has(st));
-  }).length;
+  const npFilter   = o => { const st=(o[C.STATUS]||'').trim(); return st==='PICKUP EXCEPTION'||(!isNA(o[C.PICKUP_SCH])&&isNA(o[C.PICKED_UP])&&!PENDING_ST.has(st)); };
+  const nonPickup  = orders.filter(npFilter).length;
+
+  // KPI order ID caches for download buttons
+  kpiOrders = {
+    del: orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').map(o=>(o[C.ORDER_ID]||'').trim()),
+    unf: orders.filter(o=>(o[C.STATUS]||'').trim()==='NEW ORDER').map(o=>(o[C.ORDER_ID]||'').trim()),
+    fad: orders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED'&&parseInt(o[C.ATTEMPTS])===1).map(o=>(o[C.ORDER_ID]||'').trim()),
+    np:  orders.filter(npFilter).map(o=>(o[C.ORDER_ID]||'').trim()),
+  };
 
   // COD: only 'cod' payment method
   let codSum=0;
@@ -1003,6 +1239,7 @@ function render(orders) {
   renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total);
   renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total);
   renderCourierSection(orders, shipped);
+  renderAddressScoreCharts(orders);
 }
 
 // ── Chart Utilities ─────────────────────────────────────────────────
@@ -1036,13 +1273,14 @@ function sColor(s) {
 // ── Status Chart ────────────────────────────────────────────────────
 function renderStatusChart(sc) {
   lastStatusCounts = sc;
-  // Populate status dropdown (only update if statuses changed)
   const allStatuses = Object.keys(sc).sort((a,b)=>sc[b]-sc[a]);
+
+  // Populate status dropdown (checked = visible, unchecked = excluded)
   const opts = document.getElementById('statusDdOpts');
   if (opts) {
     opts.innerHTML = allStatuses.map(s=>`
       <label>
-        <input type="checkbox" value="${esc(s)}" ${statusFilterSet.has(s)?'checked':''} onchange="onStatusCheck(this)">
+        <input type="checkbox" value="${esc(s)}" ${!statusExcludeSet.has(s)?'checked':''} onchange="onStatusCheck(this)">
         <span style="width:9px;height:9px;border-radius:2px;background:${sColor(s)};display:inline-block;flex-shrink:0"></span>
         ${esc(s)}
       </label>`).join('');
@@ -1051,26 +1289,57 @@ function renderStatusChart(sc) {
   // Apply filters (chart-only, not KPIs)
   let filtered = {...sc};
   if (hideUnfulfilled) delete filtered['NEW ORDER'];
-  if (statusFilterSet.size > 0) {
-    filtered = Object.fromEntries(Object.entries(filtered).filter(([s])=>statusFilterSet.has(s)));
-  }
+  statusExcludeSet.forEach(s => delete filtered[s]);
 
-  const sorted = Object.entries(filtered).sort((a,b)=>b[1]-a[1]).slice(0,12);
-  const tot    = sorted.reduce((s,[,v])=>s+v, 0);
-  const labels = sorted.map(([s,v]) => `${s}  ${v} (${tot?(v/tot*100).toFixed(1):0}%)`);
+  const sorted = Object.entries(filtered).sort((a,b)=>b[1]-a[1]).slice(0,14);
+
+  statusSorted = sorted;
+
   mkChart('cStatus','doughnut',{
-    labels,
+    labels: sorted.map(([s])=>s),
     datasets:[{data:sorted.map(([,v])=>v),backgroundColor:sorted.map(([s])=>sColor(s)),borderWidth:2.5,borderColor:'#fff'}]
   },{
-    cutout:'52%',
+    cutout:'54%',
     plugins:{
-      legend:{position:'right',labels:{font:{size:10.5},boxWidth:11,padding:6}},
+      legend:{display:false},
       tooltip:{callbacks:{label:ctx=>{
-        const v=ctx.parsed; const p=tot?(v/tot*100).toFixed(1):0;
+        const ci = ctx.chart;
+        let vis = 0;
+        ci.data.datasets[0].data.forEach((v,i)=>{ if(ci.getDataVisibility(i)) vis+=v; });
+        const v=ctx.parsed;
+        const p=vis>0?(v/vis*100).toFixed(1):0;
         return ` ${v.toLocaleString()} orders · ${p}%`;
       }}}
     }
   });
+
+  // Build the custom HTML legend after chart is created
+  const ci = charts['cStatus'];
+  if (ci) buildStatusLegend(ci);
+}
+
+function buildStatusLegend(ci) {
+  const legendEl = document.getElementById('statusLegend');
+  if (!legendEl || !statusSorted.length) return;
+  let vis = 0;
+  statusSorted.forEach(([,v],i) => { if(ci.getDataVisibility(i)) vis += v; });
+  legendEl.innerHTML = statusSorted.map(([s,v],i) => {
+    const isVis = ci.getDataVisibility(i);
+    const p = vis > 0 && isVis ? (v/vis*100).toFixed(1) : '—';
+    return `<div class="sli${isVis?'':' sli-hidden'}" onclick="toggleStatusLegendItem(${i})">
+      <div class="sli-dot" style="background:${sColor(s)}"></div>
+      <span class="sli-name">${esc(s)}</span>
+      <span class="sli-pct">${isVis?p+'%':'×'}</span>
+    </div>`;
+  }).join('');
+}
+
+function toggleStatusLegendItem(idx) {
+  const ci = charts['cStatus'];
+  if (!ci) return;
+  ci.getDataVisibility(idx) ? ci.hide(idx) : ci.show(idx);
+  ci.update('none');
+  buildStatusLegend(ci);
 }
 
 // ── Status Filter Controls ───────────────────────────────────────────
@@ -1082,33 +1351,72 @@ function toggleHideUnf() {
 function toggleStatusDd(e) {
   e.stopPropagation();
   document.getElementById('statusDd').classList.toggle('open');
+  // Clear search when opening
+  const si = document.querySelector('.status-dd-search input');
+  if (si && document.getElementById('statusDd').classList.contains('open')) { si.value=''; filterStatusDd(''); si.focus(); }
+}
+function filterStatusDd(q) {
+  const query = q.toLowerCase().trim();
+  document.querySelectorAll('#statusDdOpts label').forEach(el => {
+    el.classList.toggle('hidden', !!(query && !el.textContent.toLowerCase().includes(query)));
+  });
 }
 function onStatusCheck(cb) {
-  if (cb.checked) statusFilterSet.add(cb.value);
-  else statusFilterSet.delete(cb.value);
+  if (cb.checked) statusExcludeSet.delete(cb.value);  // checked = visible = not excluded
+  else statusExcludeSet.add(cb.value);                 // unchecked = hidden = excluded
   updateStatusFilterBtn();
   renderStatusChart(lastStatusCounts);
 }
-function clearStatusFilter() {
-  statusFilterSet.clear();
-  document.querySelectorAll('#statusDdOpts input').forEach(c=>c.checked=false);
+function selectAllStatuses() {
+  statusExcludeSet.clear();
+  document.querySelectorAll('#statusDdOpts input').forEach(cb => cb.checked = true);
   updateStatusFilterBtn();
   renderStatusChart(lastStatusCounts);
+}
+function clearStatusFilter() {   // "Show All" = same as select all
+  selectAllStatuses();
 }
 function updateStatusFilterBtn() {
   const el = document.getElementById('btnStatusFilter');
   if (!el) return;
-  el.textContent = statusFilterSet.size===0 ? 'All Statuses ▾' : `${statusFilterSet.size} Status${statusFilterSet.size>1?'es':''} ▾`;
-  el.classList.toggle('active', statusFilterSet.size>0);
+  const n = statusExcludeSet.size;
+  el.textContent = n===0 ? 'All Statuses ▾' : `${n} Hidden ▾`;
+  el.classList.toggle('active', n>0);
 }
 document.addEventListener('click', e => {
   const dd = document.getElementById('statusDd');
   if (dd && !e.target.closest('.stu-dd-wrap')) dd.classList.remove('open');
 });
 
+// ── Date Presets ────────────────────────────────────────────────────
+function applyQuickRange(val) {
+  if (!val) return;
+  const today = new Date();
+  const setRange = (from, to) => {
+    document.getElementById('fFrom').value = from ? ymd(from) : '';
+    document.getElementById('fTo').value   = to   ? ymd(to)   : '';
+    applyFilters();
+  };
+  if (val === 'all') { setRange(null, null); return; }
+  if (val === 'yesterday') {
+    const d = new Date(today); d.setDate(d.getDate()-1);
+    setRange(d, d); return;
+  }
+  const days = parseInt(val);
+  const from = new Date(today); from.setDate(from.getDate() - days + 1);
+  setRange(from, today);
+}
+function excludeLastDays(days) {
+  const to = new Date();
+  to.setDate(to.getDate() - days);
+  document.getElementById('fTo').value = ymd(to);
+  applyFilters();
+}
+
 // ── Trend Chart (smooth line + delivery % yellow line) ───────────────
 function renderTrendChart(orders) {
   const by={};
+  trendOrdersByDay = {};
   orders.forEach(o=>{
     const d=parseDate(o[C.CREATED]); if(!d) return;
     const k=ymd(d);
@@ -1116,6 +1424,8 @@ function renderTrendChart(orders) {
     by[k].total++;
     if((o[C.STATUS]||'').trim()==='DELIVERED') by[k].del++;
     if((o[C.STATUS]||'').trim()==='NEW ORDER')  by[k].newOrd++;
+    if(!trendOrdersByDay[k]) trendOrdersByDay[k]=[];
+    trendOrdersByDay[k].push((o[C.ORDER_ID]||'').trim());
   });
   const days    = Object.keys(by).sort();
   const counts  = days.map(d=>by[d].total);
@@ -1143,12 +1453,18 @@ function renderTrendChart(orders) {
       }
     ]
   },{
+    onClick(e,els){
+      if(!els.length||els[0].datasetIndex!==0) return;
+      const day=days[els[0].index];
+      const ids=trendOrdersByDay[day]||[];
+      if(ids.length) downloadSubset(ids,'Orders on '+day);
+    },
     plugins:{
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
         const share=trendGrand>0?(ctx.parsed.y/trendGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders (${share}% of total)`;
+        return ` ${ctx.parsed.y} orders · click bar to download`;
       }}}
     },
     scales:{
@@ -1171,12 +1487,15 @@ function renderStateChart(orders) {
   canvas.style.display=''; ndEl.style.display='none';
 
   const stateData = {};
+  stateOrderIds = {};
   orders.forEach(o=>{
     const st=(o[detectedCols.state]||'').trim()||'Unknown';
     if(!stateData[st]) stateData[st]={total:0,del:0,newOrd:0};
     stateData[st].total++;
     if((o[C.STATUS]||'').trim()==='DELIVERED') stateData[st].del++;
     if((o[C.STATUS]||'').trim()==='NEW ORDER') stateData[st].newOrd++;
+    if(!stateOrderIds[st]) stateOrderIds[st]=[];
+    stateOrderIds[st].push((o[C.ORDER_ID]||'').trim());
   });
 
   const sorted = Object.entries(stateData)
@@ -1196,12 +1515,18 @@ function renderStateChart(orders) {
       {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true}
     ]
   },{
+    onClick(e,els){
+      if(!els.length||els[0].datasetIndex!==0) return;
+      const st=labels[els[0].index];
+      const ids=stateOrderIds[st]||[];
+      if(ids.length) downloadSubset(ids,'State: '+st);
+    },
     plugins:{
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
         const share=stateGrand>0?(ctx.parsed.y/stateGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders (${share}% of total)`;
+        return ` ${ctx.parsed.y} orders · click to download`;
       }}}
     },
     scales:{
@@ -1221,12 +1546,15 @@ function renderCityTierChart(orders) {
   }
   canvas.style.display=''; ndEl.style.display='none';
 
-  const tierData = {'Tier 1':{total:0,del:0,newOrd:0},'Tier 2':{total:0,del:0,newOrd:0},'Tier 3':{total:0,del:0,newOrd:0},'Unknown':{total:0,del:0,newOrd:0}};
+  const tierData = {'Tier 1':{total:0,del:0,newOrd:0},'Tier 2':{total:0,del:0,newOrd:0},'Tier 3':{total:0,del:0,newOrd:0},'Tier 4':{total:0,del:0,newOrd:0},'Unknown':{total:0,del:0,newOrd:0}};
+  tierOrderIds = {};
   orders.forEach(o=>{
     const tier = getCityTier((o[detectedCols.city]||'').trim());
     tierData[tier].total++;
     if((o[C.STATUS]||'').trim()==='DELIVERED') tierData[tier].del++;
     if((o[C.STATUS]||'').trim()==='NEW ORDER') tierData[tier].newOrd++;
+    if(!tierOrderIds[tier]) tierOrderIds[tier]=[];
+    tierOrderIds[tier].push((o[C.ORDER_ID]||'').trim());
   });
 
   const tiers    = Object.entries(tierData).filter(([,v])=>v.total>0);
@@ -1235,7 +1563,7 @@ function renderCityTierChart(orders) {
   const delPcts  = tiers.map(([,v])=>{
     const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
   });
-  const colors   = ['rgba(97,62,152,.7)','rgba(97,62,152,.45)','rgba(97,62,152,.25)','rgba(155,127,204,.3)'];
+  const colors   = ['rgba(97,62,152,.75)','rgba(97,62,152,.52)','rgba(97,62,152,.32)','rgba(97,62,152,.16)','rgba(155,127,204,.2)'];
 
   const tierGrand = totals.reduce((s,v)=>s+v,0);
   const {min:tMin,max:tMax} = dynPctAxis(delPcts.map(Number));
@@ -1246,12 +1574,18 @@ function renderCityTierChart(orders) {
       {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8,spanGaps:true}
     ]
   },{
+    onClick(e,els){
+      if(!els.length||els[0].datasetIndex!==0) return;
+      const tier=labels[els[0].index];
+      const ids=tierOrderIds[tier]||[];
+      if(ids.length) downloadSubset(ids,'City '+tier);
+    },
     plugins:{
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
         const share=tierGrand>0?(ctx.parsed.y/tierGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders (${share}% of total)`;
+        return ` ${ctx.parsed.y} orders · click to download`;
       }}}
     },
     scales:{
@@ -1279,6 +1613,7 @@ function buildProductTable(orders) {
     pm[name].orderIds.add(oid);
   });
 
+  prodDownloadIds = {};
   tableData = Object.entries(pm).map(([name,{orderIds,sku}])=>{
     const po     = orders.filter(o=>orderIds.has((o[C.ORDER_ID]||'').trim()));
     const cnt    = po.length;
@@ -1295,6 +1630,7 @@ function buildProductTable(orders) {
     const pending    = shipped - del - rto;
     const pendingPct = cnt>0?Math.max(0,pending)/cnt*100:0;
     const postFADPct = fad>0?(del-fad)/fad*100:null;
+    prodDownloadIds[name] = [...orderIds];
     return {name,sku,cnt,shipped,del,rto,fad,delAtt,delPct,rtoPct,fadPct,unfPct,pendingPct,postFADPct};
   });
 
@@ -1335,7 +1671,7 @@ function renderTable() {
       : `Showing ${display.length} of ${total} products`;
 
   const tbody = document.getElementById('prodTbody');
-  if(!display.length){ tbody.innerHTML=`<tr><td colspan="12" class="nodata">No products match current filters</td></tr>`; }
+  if(!display.length){ tbody.innerHTML=`<tr><td colspan="13" class="nodata">No products match current filters</td></tr>`; }
   else {
     tbody.innerHTML = display.map((r,i)=>{
       const dB=r.delPct>=60?'bg-g':r.delPct>=40?'bg-y':'bg-r';
@@ -1360,6 +1696,7 @@ function renderTable() {
         <td><span class="badge ${pB}">${r.pendingPct.toFixed(1)}%</span></td>
         <td><span class="badge ${fB}">${r.delAtt>0?r.fadPct.toFixed(1)+'%':'—'}</span></td>
         <td>${postFAD}</td>
+        <td style="text-align:center"><button class="mini-dl-tbl" onclick="downloadProductOrders('${esc(r.name).replace(/'/g,"\\'")}'" title="Download ${esc(r.name)}">⬇</button></td>
       </tr>`;
     }).join('');
   }
@@ -1429,6 +1766,7 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
     {label:'>72h',  chk:h=>h>72},
   ];
   const totalPickups = opHours.length;
+  pickupBktIds = [];
   const pickupBktData = pickupBkts.map(b=>{
     const bOrders = orders.filter(o=>{
       const c=parseDate(o[C.CREATED]);
@@ -1437,6 +1775,7 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
       const hrs=(p-c)/3600000;
       return hrs>=0&&b.chk(hrs);
     });
+    pickupBktIds.push(bOrders.map(o=>(o[C.ORDER_ID]||'').trim()));
     const bShipped=bOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
     const bDel    =bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
     return {
@@ -1454,12 +1793,18 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
       {type:'line',label:'Delivery %',data:pickupBktData.map(d=>d.delPct),borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
     ]
   },{
+    onClick(e,els){
+      if(!els.length||els[0].datasetIndex!==0) return;
+      const idx=els[0].index;
+      const ids=pickupBktIds[idx]||[];
+      if(ids.length) downloadSubset(ids,'Pickup TAT '+pickupBkts[idx].label);
+    },
     plugins:{
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
         const d=pickupBktData[ctx.dataIndex];
-        return ` ${d.count} orders (${d.sharePct}% of pickups)`;
+        return ` ${d.count} orders · click to download`;
       }}}
     },
     scales:{
@@ -1746,6 +2091,114 @@ function renderCourierSection(orders, shipped) {
   if(bestFAD)    recos.push(`<div class="reco-item"><span class="reco-icon">🎯</span><div><strong>${esc(bestFAD.name)}</strong> delivers on first attempt most often (<strong>${bestFAD.fadPct.toFixed(1)}% FAD</strong>). Minimises re-attempt costs.</div></div>`);
 
   document.getElementById('courierReco').innerHTML=`<div class="reco-title">💡 Smart Recommendations</div>${recos.join('')}`;
+}
+
+// ── Address Score Charts ─────────────────────────────────────────────
+function renderAddressScoreCharts(orders) {
+  const col = detectedCols.addrScore;
+  const sec  = document.getElementById('addrScoreSec');
+  const wrap = document.getElementById('addrScoreCharts');
+  if (!col) { sec.style.display='none'; wrap.style.display='none'; return; }
+  sec.style.display=''; wrap.style.display='';
+
+  // Chart 1: Avg Address Score by Date + Delivery % (score scale 0–1)
+  const byDate = {};
+  orders.forEach(o=>{
+    const d=parseDate(o[C.CREATED]); if(!d) return;
+    const k=ymd(d);
+    const sc=parseFloat(o[col]);
+    if(!byDate[k]) byDate[k]={scores:[],del:0,shipped:0};
+    if(!isNaN(sc)&&sc>=0&&sc<=1) byDate[k].scores.push(sc);
+    if((o[C.STATUS]||'').trim()==='DELIVERED') byDate[k].del++;
+    if((o[C.STATUS]||'').trim()!=='NEW ORDER') byDate[k].shipped++;
+  });
+  const adDays    = Object.keys(byDate).sort();
+  const adScores  = adDays.map(d=>{const ss=byDate[d].scores; return ss.length?parseFloat((ss.reduce((a,v)=>a+v,0)/ss.length).toFixed(3)):null;});
+  const adDelPcts = adDays.map(d=>{const b=byDate[d]; return b.shipped>0?parseFloat((b.del/b.shipped*100).toFixed(1)):null;});
+  const {min:adMin,max:adMax}=dynPctAxis(adDelPcts.filter(v=>v!=null));
+
+  // Bar color by score: red(<0.3) → orange(0.3-0.5) → green(>0.5)
+  const scoreBarColor = v => v==null?'rgba(189,189,189,.4)':v<0.3?'rgba(198,40,40,.6)':v<0.5?'rgba(230,81,0,.6)':v<0.7?'rgba(245,127,23,.6)':'rgba(46,125,50,.65)';
+
+  mkChart('cAddrDate','bar',{
+    labels:adDays,
+    datasets:[
+      {type:'bar',label:'Avg Address Score',data:adScores,backgroundColor:adScores.map(scoreBarColor),borderRadius:2,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:adDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,spanGaps:true}
+    ]
+  },{
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        const v=ctx.parsed.y;
+        const quality=v==null?'—':v<0.3?'Poor':v<0.5?'Low':v<0.7?'Medium':'Good';
+        return ` Avg Score: ${v!=null?v.toFixed(3):'—'} (${quality})`;
+      }}}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
+      y:{type:'linear',position:'left',beginAtZero:true,max:1,
+         title:{display:true,text:'Avg Address Score (0–1)',font:{size:10}},
+         ticks:{stepSize:0.1,callback:v=>v.toFixed(1)}},
+      y1:{type:'linear',position:'right',min:adMin,max:adMax,grid:{drawOnChartArea:false},
+          title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+
+  // Chart 2: Orders by Address Score Zone + Delivery % (zones in 0–1 scale)
+  const zones = [
+    {label:'0.0–0.2\n(Very Bad)', tag:'Very Bad', chk:s=>s>=0  &&s<=0.2},
+    {label:'0.2–0.4\n(Poor)',     tag:'Poor',     chk:s=>s>0.2 &&s<=0.4},
+    {label:'0.4–0.6\n(Medium)',   tag:'Medium',   chk:s=>s>0.4 &&s<=0.6},
+    {label:'0.6–0.8\n(Good)',     tag:'Good',     chk:s=>s>0.6 &&s<=0.8},
+    {label:'0.8–1.0\n(Excellent)',tag:'Excellent',chk:s=>s>0.8 &&s<=1.0},
+  ];
+  addrZoneIds = [];
+  const zoneData = zones.map(z=>{
+    const zo = orders.filter(o=>{ const sc=parseFloat(o[col]); return !isNaN(sc)&&sc>=0&&sc<=1&&z.chk(sc); });
+    addrZoneIds.push(zo.map(o=>(o[C.ORDER_ID]||'').trim()));
+    const shipped = zo.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
+    const del     = zo.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+    return {count:zo.length, delPct:shipped>0?parseFloat((del/shipped*100).toFixed(1)):null};
+  });
+  const zLabels  = zones.map(z=>z.tag);          // short label for X axis
+  const zFullLbl = zones.map(z=>z.label);         // full label for tooltip
+  const zCounts  = zoneData.map(z=>z.count);
+  const zDelPcts = zoneData.map(z=>z.delPct);
+  const {min:zMin,max:zMax}=dynPctAxis(zDelPcts.filter(v=>v!=null));
+  const zColors  = ['rgba(198,40,40,.7)','rgba(230,81,0,.7)','rgba(245,127,23,.7)','rgba(46,125,50,.7)','rgba(27,94,32,.8)'];
+
+  mkChart('cAddrZone','bar',{
+    labels:zLabels,
+    datasets:[
+      {type:'bar',label:'Orders',data:zCounts,backgroundColor:zColors,borderRadius:4,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:zDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
+    ]
+  },{
+    onClick(e,els){
+      if(!els.length||els[0].datasetIndex!==0) return;
+      const idx=els[0].index;
+      const ids=addrZoneIds[idx]||[];
+      if(ids.length) downloadSubset(ids,'Address Score '+zones[idx].tag);
+    },
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{
+        title:([ctx])=>zFullLbl[ctx.dataIndex].replace('\n',' '),
+        label:ctx=>{
+          if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+          return ` ${ctx.parsed.y} orders · click to download`;
+        }
+      }}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10.5}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:zMin,max:zMax,grid:{drawOnChartArea:false},
+          title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
 }
 </script>
 </body>
