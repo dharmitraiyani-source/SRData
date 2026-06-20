@@ -96,6 +96,7 @@ body{font-family:'Nunito',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif
 .ms-opt:hover{background:var(--purple-l)}
 .ms-opt input[type=checkbox]{accent-color:var(--purple);flex-shrink:0;margin-top:2px;width:14px;height:14px;cursor:pointer}
 .ms-opt-name{font-size:12px;line-height:1.3;color:var(--text);word-break:break-word}
+.ms-opt-sku{font-size:9.5px;color:var(--text3);font-family:monospace;margin-top:1px;display:block;line-height:1.2}
 .ms-opt.hidden{display:none}
 .ms-footer{display:flex;gap:8px;padding:8px 12px;border-top:1px solid var(--purple-l);flex-shrink:0;background:#faf8ff}
 .ms-footer button{flex:1;padding:7px 8px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:700;font-family:inherit;transition:all .15s}
@@ -300,7 +301,7 @@ tbody tr:hover td{background:#faf8ff}
     <div class="hdr-logo">MM</div>
     <div class="hdr-text">
       <h1>SR Data Analysis by DP</h1>
-      <p id="hdrSub">v21 (16-6-26) · Upload your Shiprocket export to begin</p>
+      <p id="hdrSub">v22 (20-6-26) · Upload your Shiprocket export to begin</p>
     </div>
   </div>
   <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
@@ -342,10 +343,13 @@ tbody tr:hover td{background:#faf8ff}
     <div class="fg" style="gap:3px">
       <label>Exclude Recent</label>
       <div class="quick-btns">
+        <button class="qbtn excl" onclick="excludeLastDays(1)" title="Set end date to yesterday">−1d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(2)" title="Set end date to 2 days ago">−2d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(3)" title="Set end date to 3 days ago">−3d</button>
+        <button class="qbtn excl" onclick="excludeLastDays(5)" title="Set end date to 5 days ago">−5d</button>
         <button class="qbtn excl" onclick="excludeLastDays(7)" title="Set end date to 7 days ago">−7d</button>
         <button class="qbtn excl" onclick="excludeLastDays(9)" title="Set end date to 9 days ago">−9d</button>
         <button class="qbtn excl" onclick="excludeLastDays(11)" title="Set end date to 11 days ago">−11d</button>
-        <button class="qbtn excl" onclick="excludeLastDays(14)" title="Set end date to 14 days ago">−14d</button>
       </div>
     </div>
 
@@ -721,6 +725,7 @@ const VAR_PURPLE   = '#613e98';
 const VAR_PURPLE_D = '#3c2b60';
 const VAR_PURPLE_L = '#eef1ff';
 const VAR_YELLOW   = '#ffcd00';
+const VAR_GREEN    = '#2E7D32';
 
 // ── City Tier Lookup ────────────────────────────────────────────────
 const TIER1 = new Set([
@@ -888,11 +893,16 @@ function initData(rows, filename, headers) {
   const allProds = Object.keys(prodSkuMap).sort();
   const opts = document.getElementById('msOpts');
   opts.innerHTML = allProds.length
-    ? allProds.map(p => `
-        <label class="ms-opt${hideUpsell && isUpsellSKU(prodSkuMap[p]) ? ' hidden' : ''}" data-name="${esc(p.toLowerCase())}" data-sku="${esc(prodSkuMap[p]||'')}">
+    ? allProds.map(p => {
+        const sku = prodSkuMap[p]||'';
+        return `<label class="ms-opt${hideUpsell && isUpsellSKU(sku) ? ' hidden' : ''}" data-name="${esc(p.toLowerCase())}" data-sku="${esc(sku.toLowerCase())}">
           <input type="checkbox" value="${esc(p)}" onchange="onProdCheck(this)">
-          <span class="ms-opt-name">${esc(p)}</span>
-        </label>`).join('')
+          <span>
+            <span class="ms-opt-name">${esc(p)}</span>
+            ${sku ? `<span class="ms-opt-sku">${esc(sku)}</span>` : ''}
+          </span>
+        </label>`;
+      }).join('')
     : '<div class="ms-empty">No products found</div>';
   updateMSTrigger();
 
@@ -978,7 +988,7 @@ function filterMSOpts() {
   const q = document.getElementById('msSearch').value.toLowerCase().trim();
   document.querySelectorAll('#msOpts .ms-opt').forEach(el => {
     const upsellHidden = hideUpsell && isUpsellSKU(el.dataset.sku||'');
-    const searchHidden = q && !el.dataset.name.includes(q);
+    const searchHidden = q && !el.dataset.name.includes(q) && !(el.dataset.sku||'').includes(q);
     el.classList.toggle('hidden', upsellHidden || searchHidden);
   });
 }
@@ -1420,37 +1430,30 @@ function renderTrendChart(orders) {
   orders.forEach(o=>{
     const d=parseDate(o[C.CREATED]); if(!d) return;
     const k=ymd(d);
-    if(!by[k]) by[k]={total:0,del:0,newOrd:0};
+    if(!by[k]) by[k]={total:0,del:0,newOrd:0,fad:0,delAtt:0};
     by[k].total++;
-    if((o[C.STATUS]||'').trim()==='DELIVERED') by[k].del++;
-    if((o[C.STATUS]||'').trim()==='NEW ORDER')  by[k].newOrd++;
+    const st=(o[C.STATUS]||'').trim(), att=parseInt(o[C.ATTEMPTS]);
+    if(st==='DELIVERED') by[k].del++;
+    if(st==='NEW ORDER') by[k].newOrd++;
+    if(!isNaN(att)&&att>=1) by[k].delAtt++;
+    if(st==='DELIVERED'&&att===1) by[k].fad++;
     if(!trendOrdersByDay[k]) trendOrdersByDay[k]=[];
     trendOrdersByDay[k].push((o[C.ORDER_ID]||'').trim());
   });
   const days    = Object.keys(by).sort();
   const counts  = days.map(d=>by[d].total);
-  const delPcts = days.map(d=>{
-    const {total,del,newOrd}=by[d];
-    const shipped=total-newOrd;
-    return shipped>0 ? parseFloat((del/shipped*100).toFixed(1)) : null;
-  });
-  const {min:pMin,max:pMax} = dynPctAxis(delPcts.filter(v=>v!=null));
+  const delPcts = days.map(d=>{const b=by[d],s=b.total-b.newOrd;return s>0?parseFloat((b.del/s*100).toFixed(1)):null;});
+  const fadPcts = days.map(d=>{const b=by[d];return b.delAtt>0?parseFloat((b.fad/b.delAtt*100).toFixed(1)):null;});
+  const allPcts = [...delPcts,...fadPcts].filter(v=>v!=null);
+  const {min:pMin,max:pMax} = dynPctAxis(allPcts);
   const trendGrand = counts.reduce((s,v)=>s+v,0);
 
   mkChart('cTrend','bar',{
     labels:days,
     datasets:[
-      {
-        type:'bar',label:'Orders',data:counts,
-        backgroundColor:'rgba(97,62,152,.45)',borderRadius:2,yAxisID:'y'
-      },
-      {
-        type:'line',label:'Delivery %',data:delPcts,
-        borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',
-        borderWidth:2.5,tension:0.4,yAxisID:'y1',
-        pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,
-        spanGaps:true
-      }
+      {type:'bar',label:'Orders',data:counts,backgroundColor:'rgba(97,62,152,.45)',borderRadius:2,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,spanGaps:true},
+      {type:'line',label:'FAD %',data:fadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:3,pointHoverRadius:5,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     onClick(e,els){
@@ -1463,16 +1466,15 @@ function renderTrendChart(orders) {
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
         const share=trendGrand>0?(ctx.parsed.y/trendGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders · click bar to download`;
+        return ` ${ctx.parsed.y} orders (${share}%) · click to download`;
       }}}
     },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
       y:{type:'linear',position:'left',beginAtZero:true},
-      y1:{type:'linear',position:'right',min:pMin,max:pMax,
-          grid:{drawOnChartArea:false},
-          ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:pMin,max:pMax,grid:{drawOnChartArea:false},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1490,29 +1492,32 @@ function renderStateChart(orders) {
   stateOrderIds = {};
   orders.forEach(o=>{
     const st=(o[detectedCols.state]||'').trim()||'Unknown';
-    if(!stateData[st]) stateData[st]={total:0,del:0,newOrd:0};
+    if(!stateData[st]) stateData[st]={total:0,del:0,newOrd:0,fad:0,delAtt:0};
     stateData[st].total++;
-    if((o[C.STATUS]||'').trim()==='DELIVERED') stateData[st].del++;
-    if((o[C.STATUS]||'').trim()==='NEW ORDER') stateData[st].newOrd++;
+    const status=(o[C.STATUS]||'').trim(), att=parseInt(o[C.ATTEMPTS]);
+    if(status==='DELIVERED') stateData[st].del++;
+    if(status==='NEW ORDER') stateData[st].newOrd++;
+    if(!isNaN(att)&&att>=1) stateData[st].delAtt++;
+    if(status==='DELIVERED'&&att===1) stateData[st].fad++;
     if(!stateOrderIds[st]) stateOrderIds[st]=[];
     stateOrderIds[st].push((o[C.ORDER_ID]||'').trim());
   });
 
-  const sorted = Object.entries(stateData)
-    .sort((a,b)=>b[1].total-a[1].total).slice(0,14);
-  const labels   = sorted.map(([s])=>s);
-  const totals   = sorted.map(([,v])=>v.total);
-  const delPcts  = sorted.map(([,v])=>{
-    const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
-  });
+  const sorted  = Object.entries(stateData).sort((a,b)=>b[1].total-a[1].total).slice(0,14);
+  const labels  = sorted.map(([s])=>s);
+  const totals  = sorted.map(([,v])=>v.total);
+  const delPcts = sorted.map(([,v])=>{const s=v.total-v.newOrd;return s>0?(v.del/s*100).toFixed(1):0;});
+  const fadPcts = sorted.map(([,v])=>v.delAtt>0?parseFloat((v.fad/v.delAtt*100).toFixed(1)):null);
 
   const stateGrand = totals.reduce((s,v)=>s+v,0);
-  const {min:sMin,max:sMax} = dynPctAxis(delPcts.map(Number));
+  const allPcts = [...delPcts.map(Number),...fadPcts.filter(v=>v!=null)];
+  const {min:sMin,max:sMax} = dynPctAxis(allPcts);
   mkChart('cState','bar',{
     labels,
     datasets:[
       {type:'bar',label:'Orders',data:totals,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true}
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true},
+      {type:'line',label:'FAD %',data:fadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:4,pointHoverRadius:6,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     onClick(e,els){
@@ -1525,14 +1530,15 @@ function renderStateChart(orders) {
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
         const share=stateGrand>0?(ctx.parsed.y/stateGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders · click to download`;
+        return ` ${ctx.parsed.y} orders (${share}%) · click to download`;
       }}}
     },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:10}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:sMin,max:sMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:sMin,max:sMax,grid:{drawOnChartArea:false},title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1546,32 +1552,36 @@ function renderCityTierChart(orders) {
   }
   canvas.style.display=''; ndEl.style.display='none';
 
-  const tierData = {'Tier 1':{total:0,del:0,newOrd:0},'Tier 2':{total:0,del:0,newOrd:0},'Tier 3':{total:0,del:0,newOrd:0},'Tier 4':{total:0,del:0,newOrd:0},'Unknown':{total:0,del:0,newOrd:0}};
+  const tierData = {'Tier 1':{total:0,del:0,newOrd:0,fad:0,delAtt:0},'Tier 2':{total:0,del:0,newOrd:0,fad:0,delAtt:0},'Tier 3':{total:0,del:0,newOrd:0,fad:0,delAtt:0},'Tier 4':{total:0,del:0,newOrd:0,fad:0,delAtt:0},'Unknown':{total:0,del:0,newOrd:0,fad:0,delAtt:0}};
   tierOrderIds = {};
   orders.forEach(o=>{
-    const tier = getCityTier((o[detectedCols.city]||'').trim());
+    const tier=getCityTier((o[detectedCols.city]||'').trim());
     tierData[tier].total++;
-    if((o[C.STATUS]||'').trim()==='DELIVERED') tierData[tier].del++;
-    if((o[C.STATUS]||'').trim()==='NEW ORDER') tierData[tier].newOrd++;
+    const status=(o[C.STATUS]||'').trim(), att=parseInt(o[C.ATTEMPTS]);
+    if(status==='DELIVERED') tierData[tier].del++;
+    if(status==='NEW ORDER') tierData[tier].newOrd++;
+    if(!isNaN(att)&&att>=1) tierData[tier].delAtt++;
+    if(status==='DELIVERED'&&att===1) tierData[tier].fad++;
     if(!tierOrderIds[tier]) tierOrderIds[tier]=[];
     tierOrderIds[tier].push((o[C.ORDER_ID]||'').trim());
   });
 
-  const tiers    = Object.entries(tierData).filter(([,v])=>v.total>0);
-  const labels   = tiers.map(([t])=>t);
-  const totals   = tiers.map(([,v])=>v.total);
-  const delPcts  = tiers.map(([,v])=>{
-    const shipped=v.total-v.newOrd; return shipped>0?(v.del/shipped*100).toFixed(1):0;
-  });
-  const colors   = ['rgba(97,62,152,.75)','rgba(97,62,152,.52)','rgba(97,62,152,.32)','rgba(97,62,152,.16)','rgba(155,127,204,.2)'];
+  const tiers   = Object.entries(tierData).filter(([,v])=>v.total>0);
+  const labels  = tiers.map(([t])=>t);
+  const totals  = tiers.map(([,v])=>v.total);
+  const delPcts = tiers.map(([,v])=>{const s=v.total-v.newOrd;return s>0?(v.del/s*100).toFixed(1):0;});
+  const fadPcts = tiers.map(([,v])=>v.delAtt>0?parseFloat((v.fad/v.delAtt*100).toFixed(1)):null);
+  const colors  = ['rgba(97,62,152,.75)','rgba(97,62,152,.52)','rgba(97,62,152,.32)','rgba(97,62,152,.16)','rgba(155,127,204,.2)'];
 
   const tierGrand = totals.reduce((s,v)=>s+v,0);
-  const {min:tMin,max:tMax} = dynPctAxis(delPcts.map(Number));
+  const allPcts = [...delPcts.map(Number),...fadPcts.filter(v=>v!=null)];
+  const {min:tMin,max:tMax} = dynPctAxis(allPcts);
   mkChart('cTier','bar',{
     labels,
     datasets:[
       {type:'bar',label:'Orders',data:totals,backgroundColor:colors.slice(0,labels.length),borderRadius:4,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8,spanGaps:true}
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.12)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:6,pointHoverRadius:8,spanGaps:true},
+      {type:'line',label:'FAD %',data:fadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:6,pointHoverRadius:8,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     onClick(e,els){
@@ -1584,14 +1594,15 @@ function renderCityTierChart(orders) {
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
         const share=tierGrand>0?(ctx.parsed.y/tierGrand*100).toFixed(1):0;
-        return ` ${ctx.parsed.y} orders · click to download`;
+        return ` ${ctx.parsed.y} orders (${share}%) · click to download`;
       }}}
     },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:11}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:tMin,max:tMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:tMin,max:tMax,grid:{drawOnChartArea:false},title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
@@ -1776,21 +1787,25 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
       return hrs>=0&&b.chk(hrs);
     });
     pickupBktIds.push(bOrders.map(o=>(o[C.ORDER_ID]||'').trim()));
-    const bShipped=bOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
-    const bDel    =bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+    const bShipped = bOrders.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
+    const bDel     = bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
+    const bDelAtt  = bOrders.filter(o=>parseInt(o[C.ATTEMPTS])>=1).length;
+    const bFAD     = bOrders.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED'&&parseInt(o[C.ATTEMPTS])===1).length;
     return {
       count:bOrders.length,
       sharePct:totalPickups>0?parseFloat((bOrders.length/totalPickups*100).toFixed(1)):0,
-      delPct:bShipped>0?parseFloat((bDel/bShipped*100).toFixed(1)):null
+      delPct:bShipped>0?parseFloat((bDel/bShipped*100).toFixed(1)):null,
+      fadPct:bDelAtt>0?parseFloat((bFAD/bDelAtt*100).toFixed(1)):null
     };
   });
-  const pDelPcts = pickupBktData.map(d=>d.delPct).filter(v=>v!=null);
-  const {min:pMin,max:pMax} = dynPctAxis(pDelPcts);
+  const pAllPcts = [...pickupBktData.map(d=>d.delPct),...pickupBktData.map(d=>d.fadPct)].filter(v=>v!=null);
+  const {min:pMin,max:pMax} = dynPctAxis(pAllPcts);
   mkChart('cPickupTAT','bar',{
     labels:pickupBkts.map(b=>b.label),
     datasets:[
       {type:'bar',label:'Orders',data:pickupBktData.map(d=>d.count),backgroundColor:'rgba(97,62,152,.5)',borderRadius:4,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:pickupBktData.map(d=>d.delPct),borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
+      {type:'line',label:'Delivery %',data:pickupBktData.map(d=>d.delPct),borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true},
+      {type:'line',label:'FAD %',data:pickupBktData.map(d=>d.fadPct),borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:5,pointHoverRadius:7,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     onClick(e,els){
@@ -1803,14 +1818,15 @@ function renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total) {
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
         const d=pickupBktData[ctx.dataIndex];
-        return ` ${d.count} orders · click to download`;
+        return ` ${d.count} orders (${d.sharePct}%) · click to download`;
       }}}
     },
     scales:{
       x:{grid:{display:false},ticks:{font:{size:11}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
-      y1:{type:'linear',position:'right',min:pMin,max:pMax,grid:{drawOnChartArea:false},title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+      y1:{type:'linear',position:'right',min:pMin,max:pMax,grid:{drawOnChartArea:false},title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 
@@ -2107,30 +2123,36 @@ function renderAddressScoreCharts(orders) {
     const d=parseDate(o[C.CREATED]); if(!d) return;
     const k=ymd(d);
     const sc=parseFloat(o[col]);
-    if(!byDate[k]) byDate[k]={scores:[],del:0,shipped:0};
+    if(!byDate[k]) byDate[k]={scores:[],del:0,shipped:0,fad:0,delAtt:0};
     if(!isNaN(sc)&&sc>=0&&sc<=1) byDate[k].scores.push(sc);
-    if((o[C.STATUS]||'').trim()==='DELIVERED') byDate[k].del++;
-    if((o[C.STATUS]||'').trim()!=='NEW ORDER') byDate[k].shipped++;
+    const status=(o[C.STATUS]||'').trim(), att=parseInt(o[C.ATTEMPTS]);
+    if(status==='DELIVERED') byDate[k].del++;
+    if(status!=='NEW ORDER') byDate[k].shipped++;
+    if(!isNaN(att)&&att>=1) byDate[k].delAtt++;
+    if(status==='DELIVERED'&&att===1) byDate[k].fad++;
   });
   const adDays    = Object.keys(byDate).sort();
   const adScores  = adDays.map(d=>{const ss=byDate[d].scores; return ss.length?parseFloat((ss.reduce((a,v)=>a+v,0)/ss.length).toFixed(3)):null;});
   const adDelPcts = adDays.map(d=>{const b=byDate[d]; return b.shipped>0?parseFloat((b.del/b.shipped*100).toFixed(1)):null;});
-  const {min:adMin,max:adMax}=dynPctAxis(adDelPcts.filter(v=>v!=null));
+  const adFadPcts = adDays.map(d=>{const b=byDate[d]; return b.delAtt>0?parseFloat((b.fad/b.delAtt*100).toFixed(1)):null;});
+  const adAllPcts = [...adDelPcts,...adFadPcts].filter(v=>v!=null);
+  const {min:adMin,max:adMax}=dynPctAxis(adAllPcts);
 
-  // Bar color by score: red(<0.3) → orange(0.3-0.5) → green(>0.5)
   const scoreBarColor = v => v==null?'rgba(189,189,189,.4)':v<0.3?'rgba(198,40,40,.6)':v<0.5?'rgba(230,81,0,.6)':v<0.7?'rgba(245,127,23,.6)':'rgba(46,125,50,.65)';
 
   mkChart('cAddrDate','bar',{
     labels:adDays,
     datasets:[
       {type:'bar',label:'Avg Address Score',data:adScores,backgroundColor:adScores.map(scoreBarColor),borderRadius:2,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:adDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,spanGaps:true}
+      {type:'line',label:'Delivery %',data:adDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:3,pointHoverRadius:5,spanGaps:true},
+      {type:'line',label:'FAD %',data:adFadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.4,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:3,pointHoverRadius:5,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     plugins:{
       legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
       tooltip:{callbacks:{label:ctx=>{
         if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
         const v=ctx.parsed.y;
         const quality=v==null?'—':v<0.3?'Poor':v<0.5?'Low':v<0.7?'Medium':'Good';
         return ` Avg Score: ${v!=null?v.toFixed(3):'—'} (${quality})`;
@@ -2142,7 +2164,7 @@ function renderAddressScoreCharts(orders) {
          title:{display:true,text:'Avg Address Score (0–1)',font:{size:10}},
          ticks:{stepSize:0.1,callback:v=>v.toFixed(1)}},
       y1:{type:'linear',position:'right',min:adMin,max:adMax,grid:{drawOnChartArea:false},
-          title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+          title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 
@@ -2160,20 +2182,30 @@ function renderAddressScoreCharts(orders) {
     addrZoneIds.push(zo.map(o=>(o[C.ORDER_ID]||'').trim()));
     const shipped = zo.filter(o=>(o[C.STATUS]||'').trim()!=='NEW ORDER').length;
     const del     = zo.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED').length;
-    return {count:zo.length, delPct:shipped>0?parseFloat((del/shipped*100).toFixed(1)):null};
+    const delAtt  = zo.filter(o=>parseInt(o[C.ATTEMPTS])>=1).length;
+    const fad     = zo.filter(o=>(o[C.STATUS]||'').trim()==='DELIVERED'&&parseInt(o[C.ATTEMPTS])===1).length;
+    return {
+      count:zo.length,
+      delPct:shipped>0?parseFloat((del/shipped*100).toFixed(1)):null,
+      fadPct:delAtt>0?parseFloat((fad/delAtt*100).toFixed(1)):null
+    };
   });
-  const zLabels  = zones.map(z=>z.tag);          // short label for X axis
-  const zFullLbl = zones.map(z=>z.label);         // full label for tooltip
+  const zLabels  = zones.map(z=>z.tag);
+  const zFullLbl = zones.map(z=>z.label);
   const zCounts  = zoneData.map(z=>z.count);
   const zDelPcts = zoneData.map(z=>z.delPct);
-  const {min:zMin,max:zMax}=dynPctAxis(zDelPcts.filter(v=>v!=null));
+  const zFadPcts = zoneData.map(z=>z.fadPct);
+  const zGrand   = zCounts.reduce((s,v)=>s+v,0);
+  const zAllPcts = [...zDelPcts,...zFadPcts].filter(v=>v!=null);
+  const {min:zMin,max:zMax}=dynPctAxis(zAllPcts);
   const zColors  = ['rgba(198,40,40,.7)','rgba(230,81,0,.7)','rgba(245,127,23,.7)','rgba(46,125,50,.7)','rgba(27,94,32,.8)'];
 
   mkChart('cAddrZone','bar',{
     labels:zLabels,
     datasets:[
       {type:'bar',label:'Orders',data:zCounts,backgroundColor:zColors,borderRadius:4,yAxisID:'y'},
-      {type:'line',label:'Delivery %',data:zDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true}
+      {type:'line',label:'Delivery %',data:zDelPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.08)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:5,pointHoverRadius:7,spanGaps:true},
+      {type:'line',label:'FAD %',data:zFadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:5,pointHoverRadius:7,spanGaps:true,borderDash:[4,3]}
     ]
   },{
     onClick(e,els){
@@ -2188,7 +2220,9 @@ function renderAddressScoreCharts(orders) {
         title:([ctx])=>zFullLbl[ctx.dataIndex].replace('\n',' '),
         label:ctx=>{
           if(ctx.dataset.label==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
-          return ` ${ctx.parsed.y} orders · click to download`;
+          if(ctx.dataset.label==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
+          const share=zGrand>0?(ctx.parsed.y/zGrand*100).toFixed(1):0;
+          return ` ${ctx.parsed.y} orders (${share}%) · click to download`;
         }
       }}
     },
@@ -2196,7 +2230,7 @@ function renderAddressScoreCharts(orders) {
       x:{grid:{display:false},ticks:{font:{size:10.5}}},
       y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
       y1:{type:'linear',position:'right',min:zMin,max:zMax,grid:{drawOnChartArea:false},
-          title:{display:true,text:'Delivery %',font:{size:10}},ticks:{callback:v=>v+'%'}}
+          title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
     }
   });
 }
