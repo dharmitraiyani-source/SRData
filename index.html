@@ -301,7 +301,7 @@ tbody tr:hover td{background:#faf8ff}
     <div class="hdr-logo">MM</div>
     <div class="hdr-text">
       <h1>SR Data Analysis by DP</h1>
-      <p id="hdrSub">v22 (20-6-26) · Upload your Shiprocket export to begin</p>
+      <p id="hdrSub">v23 (20-6-26) · Upload your Shiprocket export to begin</p>
     </div>
   </div>
   <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
@@ -656,6 +656,7 @@ tbody tr:hover td{background:#faf8ff}
   <div class="cgrid" id="addrScoreCharts" style="display:none">
     <div class="cc">
       <h3>📅 Avg Address Score by Date</h3>
+      <p id="addrDateAvg" style="margin:0 0 6px;font-size:11px;color:var(--text2);font-weight:600;letter-spacing:.01em"></p>
       <div class="chart-wrap"><canvas id="cAddrDate"></canvas></div>
     </div>
     <div class="cc">
@@ -873,15 +874,24 @@ function initData(rows, filename, headers) {
     if (id && id !== 'Order ID' && !orderMap[id]) orderMap[id] = r;
   });
 
-  // Compute upsell-only order IDs (all product rows have numeric-only SKUs)
-  const orderHasMain = {};
+  // Compute upsell-only order IDs
+  // Rule: auto-generated upsell SKUs are purely numeric with 10+ digits (e.g. 14934777790618)
+  // An order is "upsell-only" if it has ≥1 upsell SKU AND zero non-upsell SKUs
+  // Rows with blank/empty SKU are ignored — a missing SKU never counts as a "main product"
+  const orderHasMain    = {};
+  const orderHasUpsell  = {};
   rows.forEach(r => {
     const oid = (r[C.ORDER_ID]||'').trim();
     if (!oid) return;
     if (!(oid in orderHasMain)) orderHasMain[oid] = false;
-    if (!isUpsellSKU((r[C.MASTER_SKU]||'').trim())) orderHasMain[oid] = true;
+    const sku = (r[C.MASTER_SKU]||'').trim();
+    if (!sku) return;                        // blank SKU row — skip entirely
+    if (isUpsellSKU(sku)) orderHasUpsell[oid] = true;
+    else                   orderHasMain[oid]   = true;
   });
-  upsellOnlyIds = new Set(Object.entries(orderHasMain).filter(([,v])=>!v).map(([k])=>k));
+  upsellOnlyIds = new Set(
+    Object.keys(orderHasMain).filter(oid => orderHasUpsell[oid] && !orderHasMain[oid])
+  );
 
   // Build product SKU map & populate multi-select
   const prodSkuMap = {};
@@ -1673,7 +1683,7 @@ function renderTable() {
   });
 
   const total   = sorted.length;
-  const limit   = showAllProds ? total : Math.min(20, total);
+  const limit   = showAllProds ? total : Math.min(10, total);
   const display = sorted.slice(0, limit);
 
   document.getElementById('tableInfo').textContent =
@@ -1715,9 +1725,9 @@ function renderTable() {
   // Show All / Show Less button
   const wrap = document.getElementById('showAllWrap');
   const btn  = document.getElementById('btnShowAll');
-  if (total > 20) {
+  if (total > 10) {
     wrap.style.display = 'block';
-    btn.textContent = showAllProds ? `▲ Show Top 20 Only` : `▼ Show All ${total} Products`;
+    btn.textContent = showAllProds ? `▲ Show Top 10 Only` : `▼ Show All ${total} Products`;
   } else {
     wrap.style.display = 'none';
   }
@@ -2116,6 +2126,15 @@ function renderAddressScoreCharts(orders) {
   const wrap = document.getElementById('addrScoreCharts');
   if (!col) { sec.style.display='none'; wrap.style.display='none'; return; }
   sec.style.display=''; wrap.style.display='';
+
+  // Overall average address score across all scored orders
+  const allScored = orders.map(o=>parseFloat(o[col])).filter(v=>!isNaN(v)&&v>=0&&v<=1);
+  const overallAvg = allScored.length ? allScored.reduce((a,v)=>a+v,0)/allScored.length : null;
+  const avgQuality = overallAvg==null?'—':overallAvg<0.3?'Poor':overallAvg<0.5?'Low':overallAvg<0.7?'Medium':overallAvg<0.9?'Good':'Excellent';
+  const addrAvgEl = document.getElementById('addrDateAvg');
+  if (addrAvgEl) addrAvgEl.textContent = overallAvg!=null
+    ? `Overall Average: ${overallAvg.toFixed(3)} (${avgQuality}) · ${allScored.length.toLocaleString()} orders scored`
+    : '';
 
   // Chart 1: Avg Address Score by Date + Delivery % (score scale 0–1)
   const byDate = {};
