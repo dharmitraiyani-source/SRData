@@ -284,13 +284,8 @@ tbody tr:hover td{background:#faf8ff}
 .courier-table tbody td{padding:9px 12px;border-bottom:1px solid #f5f0ff;vertical-align:middle}
 .courier-table tbody tr:last-child td{border-bottom:none}
 .courier-table tbody tr:hover td{background:#faf8ff}
-.courier-reco{background:#fff;border-radius:14px;padding:18px 20px;border:1px solid var(--border);box-shadow:0 2px 8px rgba(97,62,152,.07);margin-bottom:13px}
-.reco-title{font-size:11.5px;font-weight:900;color:var(--purple-d);text-transform:uppercase;letter-spacing:.08em;margin-bottom:12px}
-.reco-item{display:flex;gap:12px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--purple-l)}
-.reco-item:last-child{border-bottom:none;padding-bottom:0}
-.reco-icon{font-size:18px;flex-shrink:0;margin-top:1px}
-.reco-item div{font-size:12.5px;color:var(--text2);line-height:1.5}
-.reco-item strong{color:var(--purple-d)}
+.aov-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:13px}
+@media(max-width:900px){.aov-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -301,7 +296,7 @@ tbody tr:hover td{background:#faf8ff}
     <div class="hdr-logo">MM</div>
     <div class="hdr-text">
       <h1>SR Data Analysis by DP</h1>
-      <p id="hdrSub">v23 (20-6-26) · Upload your Shiprocket export to begin</p>
+      <p id="hdrSub">v24 (22-6-26) · Upload your Shiprocket export to begin</p>
     </div>
   </div>
   <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
@@ -647,6 +642,39 @@ tbody tr:hover td{background:#faf8ff}
     <p style="padding:24px;text-align:center;color:var(--text3);font-weight:600">Upload a CSV to see courier analysis</p>
   </div>
 
+  <!-- ===== SECTION: ORDER VALUE & QUANTITY ANALYSIS ===== -->
+  <div class="sec-div">
+    <h2>💰 Order Value &amp; Quantity Analysis</h2>
+    <div class="sd-line"></div>
+    <span class="sec-tag">Value</span>
+  </div>
+  <div class="aov-grid">
+    <div class="ins-card">
+      <span class="ic-ico">✅</span>
+      <div class="ic-label">AOV — Delivered Orders</div>
+      <div class="ic-val" id="aovDel">—</div>
+      <div class="ic-sub" id="aovDelSub"></div>
+    </div>
+    <div class="ins-card">
+      <span class="ic-ico">↩️</span>
+      <div class="ic-label">AOV — RTO Orders</div>
+      <div class="ic-val" id="aovRTO">—</div>
+      <div class="ic-sub" id="aovRTOSub"></div>
+    </div>
+    <div class="ins-card">
+      <span class="ic-ico">⏳</span>
+      <div class="ic-label">AOV — Pending Orders</div>
+      <div class="ic-val" id="aovPending">—</div>
+      <div class="ic-sub" id="aovPendingSub"></div>
+    </div>
+  </div>
+  <div class="cgrid">
+    <div class="cc" style="grid-column:1/-1">
+      <h3>📦 Orders by Quantity Slab — Delivery % · RTO % · AOV</h3>
+      <div class="chart-wrap"><canvas id="cQtySlab"></canvas><div class="nodata-chart" id="ndQtySlab" style="display:none">Quantity column not found in CSV</div></div>
+    </div>
+  </div>
+
   <!-- ===== SECTION: ADDRESS SCORE ===== -->
   <div class="sec-div" id="addrScoreSec" style="display:none">
     <h2>📍 Address Score Analysis</h2>
@@ -691,6 +719,23 @@ let tierOrderIds      = {};  // tier string → [order IDs]
 let pickupBktIds      = [];  // array per bucket → [order IDs]
 let addrZoneIds       = [];  // array per score zone → [order IDs]
 let prodDownloadIds   = {};  // product name → [order IDs]
+let freightDayIds     = {};  // date string → [order IDs]
+let weightSlabIds     = [];  // array per weight slab → [order IDs]
+let chgWeightSlabIds  = [];  // array per charged-weight slab → [order IDs]
+let qtySlabIds        = [];  // array per quantity slab → [order IDs]
+
+const WEIGHT_SLABS = [
+  {label:'0–0.5kg', min:0,  max:0.5},
+  {label:'0.5–1kg',  min:0.5,max:1},
+  {label:'1–2kg',    min:1, max:2},
+  {label:'2–3kg',    min:2, max:3},
+  {label:'3–5kg',    min:3, max:5},
+  {label:'5–10kg',   min:5, max:10},
+  {label:'10kg+',    min:10,max:Infinity},
+];
+const weightSlabIndex = v => { for(let i=0;i<WEIGHT_SLABS.length;i++){const s=WEIGHT_SLABS[i]; if(v>=s.min&&v<s.max) return i;} return -1; };
+const QTY_SLABS  = ['1','2','3','4','5+'];
+const qtySlabIndex = q => q>=5 ? 4 : Math.max(0,Math.round(q)-1);
 
 // ── Column filter state ─────────────────────────────────────────────
 const CF = {
@@ -824,7 +869,19 @@ const esc       = s => String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').re
 const set       = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=val; };
 const setHTML   = (id,html) => { const el=document.getElementById(id); if(el) el.innerHTML=html; };
 const diffDays  = (d1,d2) => d1&&d2 ? (d2-d1)/86400000 : null;
-const isUpsellSKU = sku => /^\d{10,}$/.test((sku||'').trim());
+// Auto-generated upsell SKUs are purely numeric, 10+ digits. CSVs re-saved through Excel can
+// mangle long numeric SKUs into ".0" floats, comma-grouped numbers, or scientific notation —
+// normalize those forms before testing so no upsell SKU silently slips through as "main product".
+const isUpsellSKU = sku => {
+  let s = (sku||'').trim().replace(/,/g,'');
+  if (!s) return false;
+  if (/^\d+\.0+$/.test(s)) s = s.split('.')[0];
+  else if (/^\d(\.\d+)?[eE]\+?\d+$/.test(s)) {
+    const n = Number(s);
+    if (isFinite(n)) s = Math.round(n).toString();
+  }
+  return /^\d{10,}$/.test(s);
+};
 
 // ── Auto-detect columns that might differ between Shiprocket export versions ──
 function detectColumns(headers) {
@@ -836,6 +893,11 @@ function detectColumns(headers) {
     deliveredDate: find(['delivered','date']) || find(['delivery','date']),
     courier      : headers.find((_,i) => lower[i].includes('courier')) || null,
     addrScore    : find(['address','score']) || find(['pincode','score']) || headers.find((_,i) => lower[i]==='score') || null,
+    freight      : find(['freight']),
+    weight       : headers.find((_,i) => lower[i].includes('weight') && !lower[i].includes('charged')) || null,
+    chargedWeight: find(['charged','weight']),
+    orderValue   : find(['order','total']) || find(['sub','total']) || find(['order','value']) || headers.find((_,i) => lower[i]==='total') || find(['total','amount']),
+    quantity     : find(['quantity']) || find(['qty']),
   };
 }
 
@@ -1259,6 +1321,7 @@ function render(orders) {
   renderTATSection(orders, DELIVERED, shipped, NEW_ORDER, total);
   renderInsightsSection(orders, shipped, DELIVERED, NEW_ORDER, total);
   renderCourierSection(orders, shipped);
+  renderValueQtySection(orders);
   renderAddressScoreCharts(orders);
 }
 
@@ -2073,7 +2136,16 @@ function renderCourierSection(orders, shipped) {
       <div class="cc"><h3>📦 Delivery % by Courier</h3><div class="chart-wrap"><canvas id="cCourierDel"></canvas></div></div>
       <div class="cc"><h3>↩️ RTO % by Courier</h3><div class="chart-wrap"><canvas id="cCourierRTO"></canvas></div></div>
     </div>
-    <div class="courier-reco" id="courierReco"></div>`;
+    <div class="cgrid">
+      <div class="cc">
+        <h3>💰 Avg Freight Amount by Date</h3>
+        <div class="chart-wrap"><canvas id="cFreightDay"></canvas><div class="nodata-chart" id="ndFreight" style="display:none">Freight Total Amount column not found in CSV</div></div>
+      </div>
+      <div class="cc">
+        <h3>⚖️ Orders by Weight Slab (Weight vs Charged Weight)</h3>
+        <div class="chart-wrap"><canvas id="cWeightSlab"></canvas><div class="nodata-chart" id="ndWeightSlab" style="display:none">Weight / Charged Weight column not found in CSV</div></div>
+      </div>
+    </div>`;
 
   mkChart('cCourierDel','bar',{
     labels:stats.map(s=>s.name),
@@ -2103,20 +2175,244 @@ function renderCourierSection(orders, shipped) {
     scales:{x:{beginAtZero:true,ticks:{callback:v=>v+'%'}},y:{grid:{display:false}}}
   });
 
-  const bestDel    = stats.reduce((b,s)=>s.delPct>b.delPct?s:b, stats[0]);
-  const bestRTO    = stats.reduce((b,s)=>s.rtoPct<b.rtoPct?s:b, stats[0]);
-  const fastPickup = stats.filter(s=>s.avgPickupHrs!=null).reduce((b,s)=>!b||s.avgPickupHrs<b.avgPickupHrs?s:b, null);
-  const fastDel    = stats.filter(s=>s.avgDelDays!=null).reduce((b,s)=>!b||s.avgDelDays<b.avgDelDays?s:b, null);
-  const bestFAD    = stats.filter(s=>s.fadPct>0).reduce((b,s)=>!b||s.fadPct>b.fadPct?s:b, null);
+  renderFreightChart(orders);
+  renderWeightSlabChart(orders);
+}
 
-  const recos=[];
-  recos.push(`<div class="reco-item"><span class="reco-icon">🏆</span><div><strong>${esc(bestDel.name)}</strong> has the highest delivery rate at <strong>${bestDel.delPct.toFixed(1)}%</strong>. Best choice for standard shipments.</div></div>`);
-  recos.push(`<div class="reco-item"><span class="reco-icon">✅</span><div><strong>${esc(bestRTO.name)}</strong> has the lowest RTO rate at <strong>${bestRTO.rtoPct.toFixed(1)}%</strong>. Preferred for high-value COD orders.</div></div>`);
-  if(fastDel)    recos.push(`<div class="reco-item"><span class="reco-icon">🗓️</span><div><strong>${esc(fastDel.name)}</strong> delivers fastest on average — <strong>${fastDel.avgDelDays.toFixed(1)} days</strong> from order to delivery. Best for faster customer experience.</div></div>`);
-  if(fastPickup) recos.push(`<div class="reco-item"><span class="reco-icon">⚡</span><div><strong>${esc(fastPickup.name)}</strong> picks up fastest on average (<strong>${fmtPickup(fastPickup.avgPickupHrs)}</strong>). Best for time-sensitive orders.</div></div>`);
-  if(bestFAD)    recos.push(`<div class="reco-item"><span class="reco-icon">🎯</span><div><strong>${esc(bestFAD.name)}</strong> delivers on first attempt most often (<strong>${bestFAD.fadPct.toFixed(1)}% FAD</strong>). Minimises re-attempt costs.</div></div>`);
+// ── Freight Amount Chart ──────────────────────────────────────────────
+function renderFreightChart(orders) {
+  const canvas = document.getElementById('cFreightDay');
+  const ndEl   = document.getElementById('ndFreight');
+  if (!detectedCols.freight) { canvas.style.display='none'; ndEl.style.display='flex'; return; }
+  canvas.style.display=''; ndEl.style.display='none';
 
-  document.getElementById('courierReco').innerHTML=`<div class="reco-title">💡 Smart Recommendations</div>${recos.join('')}`;
+  const by = {};
+  freightDayIds = {};
+  orders.forEach(o=>{
+    const d = parseDate(o[C.CREATED]); if(!d) return;
+    const v = parseFloat(o[detectedCols.freight]); if(!isFinite(v)) return;
+    const k = ymd(d);
+    if(!by[k]) by[k]={sum:0,cnt:0};
+    by[k].sum+=v; by[k].cnt++;
+    if(!freightDayIds[k]) freightDayIds[k]=[];
+    freightDayIds[k].push((o[C.ORDER_ID]||'').trim());
+  });
+
+  if (!Object.keys(by).length) { canvas.style.display='none'; ndEl.style.display='flex'; ndEl.textContent='No freight data in current filter'; return; }
+
+  const days = Object.keys(by).sort();
+  const avgs = days.map(d=>parseFloat((by[d].sum/by[d].cnt).toFixed(2)));
+
+  mkChart('cFreightDay','bar',{
+    labels:days,
+    datasets:[{label:'Avg Freight',data:avgs,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'}]
+  },{
+    onClick(e,els){
+      if(!els.length) return;
+      const day=days[els[0].index];
+      const ids=freightDayIds[day]||[];
+      if(ids.length) downloadSubset(ids,'Freight on '+day);
+    },
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:ctx=>{
+        const d=days[ctx.dataIndex];
+        return ` ${fmtINR(ctx.parsed.y)} avg freight · ${by[d].cnt} orders · click to download`;
+      }}}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10},maxTicksLimit:16,maxRotation:45}},
+      y:{type:'linear',beginAtZero:true,title:{display:true,text:'Avg Freight (₹)',font:{size:10}},ticks:{callback:v=>'₹'+v}}
+    }
+  });
+}
+
+// ── Weight Slab Chart (Weight vs Charged Weight) ──────────────────────
+function renderWeightSlabChart(orders) {
+  const canvas = document.getElementById('cWeightSlab');
+  const ndEl   = document.getElementById('ndWeightSlab');
+  if (!detectedCols.weight && !detectedCols.chargedWeight) { canvas.style.display='none'; ndEl.style.display='flex'; return; }
+  canvas.style.display=''; ndEl.style.display='none';
+
+  const n = WEIGHT_SLABS.length;
+  const wCounts = Array(n).fill(0), cCounts = Array(n).fill(0);
+  const wDel = Array(n).fill(0), wDelAtt = Array(n).fill(0), wFad = Array(n).fill(0), wShipped = Array(n).fill(0);
+  weightSlabIds    = Array.from({length:n},()=>[]);
+  chgWeightSlabIds = Array.from({length:n},()=>[]);
+
+  orders.forEach(o=>{
+    const oid = (o[C.ORDER_ID]||'').trim();
+    const st  = (o[C.STATUS]||'').trim(), att = parseInt(o[C.ATTEMPTS]);
+    if (detectedCols.weight) {
+      const v = parseFloat(o[detectedCols.weight]);
+      if (isFinite(v) && v>=0) {
+        const idx = weightSlabIndex(v);
+        if (idx>=0) {
+          wCounts[idx]++;
+          weightSlabIds[idx].push(oid);
+          if (st!=='NEW ORDER') wShipped[idx]++;
+          if (st==='DELIVERED') wDel[idx]++;
+          if (!isNaN(att) && att>=1) { wDelAtt[idx]++; if (att===1 && st==='DELIVERED') wFad[idx]++; }
+        }
+      }
+    }
+    if (detectedCols.chargedWeight) {
+      const v = parseFloat(o[detectedCols.chargedWeight]);
+      if (isFinite(v) && v>=0) {
+        const idx = weightSlabIndex(v);
+        if (idx>=0) { cCounts[idx]++; chgWeightSlabIds[idx].push(oid); }
+      }
+    }
+  });
+
+  const labels  = WEIGHT_SLABS.map(s=>s.label);
+  const delPcts = wShipped.map((s,i)=>s>0?parseFloat((wDel[i]/s*100).toFixed(1)):null);
+  const fadPcts = wDelAtt.map((d,i)=>d>0?parseFloat((wFad[i]/d*100).toFixed(1)):null);
+  const allPcts = [...delPcts.filter(v=>v!=null),...fadPcts.filter(v=>v!=null)];
+  const {min:wMin,max:wMax} = dynPctAxis(allPcts);
+  const wGrand = wCounts.reduce((s,v)=>s+v,0);
+  const cGrand = cCounts.reduce((s,v)=>s+v,0);
+
+  const datasets = [];
+  if (detectedCols.weight)        datasets.push({type:'bar',label:'Orders (Weight)',data:wCounts,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'});
+  if (detectedCols.chargedWeight) datasets.push({type:'bar',label:'Orders (Charged Weight)',data:cCounts,backgroundColor:'rgba(97,62,152,.22)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'});
+  datasets.push({type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true});
+  datasets.push({type:'line',label:'FAD %',data:fadPcts,borderColor:VAR_GREEN,backgroundColor:'rgba(46,125,50,.07)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_GREEN,pointRadius:4,pointHoverRadius:6,spanGaps:true,borderDash:[4,3]});
+
+  mkChart('cWeightSlab','bar',{ labels, datasets },{
+    onClick(e,els){
+      if(!els.length) return;
+      const idx=els[0].index;
+      const lbl=e.chart.data.datasets[els[0].datasetIndex].label;
+      if (lbl==='Orders (Weight)')          { const ids=weightSlabIds[idx]||[];    if(ids.length) downloadSubset(ids,'Weight slab '+labels[idx]); }
+      else if (lbl==='Orders (Charged Weight)') { const ids=chgWeightSlabIds[idx]||[]; if(ids.length) downloadSubset(ids,'Charged Weight slab '+labels[idx]); }
+    },
+    plugins:{
+      legend:{labels:{font:{size:10},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        const lbl=ctx.dataset.label;
+        if (lbl==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if (lbl==='FAD %') return ` FAD (1st Att): ${ctx.parsed.y}%`;
+        const grand = lbl==='Orders (Charged Weight)' ? cGrand : wGrand;
+        const share = grand>0?(ctx.parsed.y/grand*100).toFixed(1):0;
+        return ` ${ctx.parsed.y} orders (${share}%) · click to download`;
+      }}}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:10}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:wMin,max:wMax,grid:{drawOnChartArea:false},title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
+}
+
+// ── Order Value & Quantity Analysis ───────────────────────────────────
+function renderValueQtySection(orders) {
+  if (!detectedCols.orderValue) {
+    set('aovDel','—');     set('aovDelSub','Order value column not found in CSV');
+    set('aovRTO','—');     set('aovRTOSub','Order value column not found in CSV');
+    set('aovPending','—'); set('aovPendingSub','Order value column not found in CSV');
+  } else {
+    const groups = {del:[],rto:[],pending:[]};
+    orders.forEach(o=>{
+      const st = (o[C.STATUS]||'').trim();
+      const v  = parseFloat(o[detectedCols.orderValue]);
+      if (!isFinite(v)) return;
+      if (st==='DELIVERED') groups.del.push(v);
+      else if (st==='RTO DELIVERED') groups.rto.push(v);
+      else if (st!=='NEW ORDER') groups.pending.push(v);
+    });
+    const avg = arr => arr.reduce((s,v)=>s+v,0)/arr.length;
+    set('aovDel',     groups.del.length     ? fmtINR(avg(groups.del))     : '—');
+    set('aovDelSub',  groups.del.length     ? groups.del.length.toLocaleString()+' delivered orders' : 'No data in current filter');
+    set('aovRTO',     groups.rto.length     ? fmtINR(avg(groups.rto))     : '—');
+    set('aovRTOSub',  groups.rto.length     ? groups.rto.length.toLocaleString()+' RTO orders' : 'No data in current filter');
+    set('aovPending', groups.pending.length ? fmtINR(avg(groups.pending)) : '—');
+    set('aovPendingSub', groups.pending.length ? groups.pending.length.toLocaleString()+' pending orders' : 'No data in current filter');
+  }
+  renderQtyChart(orders);
+}
+
+// ── Quantity Slab Chart ────────────────────────────────────────────────
+function renderQtyChart(orders) {
+  const canvas = document.getElementById('cQtySlab');
+  const ndEl   = document.getElementById('ndQtySlab');
+  if (!detectedCols.quantity) { canvas.style.display='none'; ndEl.style.display='flex'; return; }
+  canvas.style.display=''; ndEl.style.display='none';
+
+  const ids = new Set(orders.map(o=>(o[C.ORDER_ID]||'').trim()));
+  const qtyByOrder = {};
+  rawRows.forEach(r=>{
+    const oid = (r[C.ORDER_ID]||'').trim();
+    if (!oid || !ids.has(oid)) return;
+    const sku = (r[C.MASTER_SKU]||'').trim();
+    if (hideUpsell && isUpsellSKU(sku)) return;
+    const q = parseFloat(r[detectedCols.quantity]);
+    if (!isFinite(q)) return;
+    qtyByOrder[oid] = (qtyByOrder[oid]||0) + q;
+  });
+
+  const n = QTY_SLABS.length;
+  const counts = Array(n).fill(0), valSum = Array(n).fill(0), valCnt = Array(n).fill(0);
+  const del = Array(n).fill(0), rto = Array(n).fill(0), shipped = Array(n).fill(0);
+  qtySlabIds = Array.from({length:n},()=>[]);
+
+  orders.forEach(o=>{
+    const oid = (o[C.ORDER_ID]||'').trim();
+    const q = qtyByOrder[oid]; if (q==null) return;
+    const idx = qtySlabIndex(q);
+    counts[idx]++;
+    qtySlabIds[idx].push(oid);
+    const st = (o[C.STATUS]||'').trim();
+    if (st!=='NEW ORDER') shipped[idx]++;
+    if (st==='DELIVERED') del[idx]++;
+    if (st==='RTO DELIVERED') rto[idx]++;
+    if (detectedCols.orderValue) {
+      const v = parseFloat(o[detectedCols.orderValue]);
+      if (isFinite(v)) { valSum[idx]+=v; valCnt[idx]++; }
+    }
+  });
+
+  if (!counts.reduce((s,v)=>s+v,0)) { canvas.style.display='none'; ndEl.style.display='flex'; ndEl.textContent='No quantity data in current filter'; return; }
+
+  const delPcts  = shipped.map((s,i)=>s>0?parseFloat((del[i]/s*100).toFixed(1)):null);
+  const rtoPcts  = shipped.map((s,i)=>s>0?parseFloat((rto[i]/s*100).toFixed(1)):null);
+  const aovBySlab= valCnt.map((c,i)=>c>0?Math.round(valSum[i]/c):null);
+  const grand    = counts.reduce((s,v)=>s+v,0);
+  const allPcts  = [...delPcts.filter(v=>v!=null),...rtoPcts.filter(v=>v!=null)];
+  const {min:qMin,max:qMax} = dynPctAxis(allPcts);
+
+  mkChart('cQtySlab','bar',{
+    labels:QTY_SLABS.map(s=>'Qty '+s),
+    datasets:[
+      {type:'bar',label:'Orders',data:counts,backgroundColor:'rgba(97,62,152,.55)',borderColor:VAR_PURPLE,borderWidth:1,borderRadius:3,yAxisID:'y'},
+      {type:'line',label:'Delivery %',data:delPcts,borderColor:VAR_YELLOW,backgroundColor:'rgba(255,205,0,.1)',borderWidth:2.5,tension:0.3,yAxisID:'y1',pointBackgroundColor:VAR_YELLOW,pointRadius:4,pointHoverRadius:6,spanGaps:true},
+      {type:'line',label:'RTO %',data:rtoPcts,borderColor:'#C62828',backgroundColor:'rgba(198,40,40,.06)',borderWidth:2,tension:0.3,yAxisID:'y1',pointBackgroundColor:'#C62828',pointRadius:4,pointHoverRadius:6,spanGaps:true,borderDash:[4,3]}
+    ]
+  },{
+    onClick(e,els){
+      if(!els.length) return;
+      const idx=els[0].index;
+      const ids=qtySlabIds[idx]||[];
+      if(ids.length) downloadSubset(ids,'Quantity '+QTY_SLABS[idx]);
+    },
+    plugins:{
+      legend:{labels:{font:{size:10.5},boxWidth:11,padding:8}},
+      tooltip:{callbacks:{label:ctx=>{
+        const lbl=ctx.dataset.label;
+        if (lbl==='Delivery %') return ` Delivery: ${ctx.parsed.y}%`;
+        if (lbl==='RTO %') return ` RTO: ${ctx.parsed.y}%`;
+        const share=grand>0?(ctx.parsed.y/grand*100).toFixed(1):0;
+        const aov=aovBySlab[ctx.dataIndex];
+        return [` ${ctx.parsed.y} orders (${share}%)`, aov!=null?` AOV: ${fmtINR(aov)}`:null,` click to download`].filter(Boolean);
+      }}}
+    },
+    scales:{
+      x:{grid:{display:false},ticks:{font:{size:11}}},
+      y:{type:'linear',position:'left',beginAtZero:true,title:{display:true,text:'Orders',font:{size:10}}},
+      y1:{type:'linear',position:'right',min:qMin,max:qMax,grid:{drawOnChartArea:false},title:{display:true,text:'%',font:{size:10}},ticks:{callback:v=>v+'%'}}
+    }
+  });
 }
 
 // ── Address Score Charts ─────────────────────────────────────────────
