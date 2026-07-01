@@ -296,7 +296,7 @@ tbody tr:hover td{background:#faf8ff}
     <div class="hdr-logo">MM</div>
     <div class="hdr-text">
       <h1>SR Data Analysis by DP</h1>
-      <p id="hdrSub">v24 (22-6-26) · Upload your Shiprocket export to begin</p>
+      <p id="hdrSub">v26 (1-7-26) · Upload your Shiprocket export to begin</p>
     </div>
   </div>
   <button class="btn-file" id="changeBtn" style="display:none" onclick="csvInput.click()">📂 Change File</button>
@@ -1160,69 +1160,249 @@ function openDownloadTab(rows, label) {
   if (!rows.length) { alert('No data for: ' + label); return; }
   const headers = Object.keys(rows[0]);
   const esc2 = s => String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const tdStyle = 'style="padding:4px 8px;border:1px solid #ddd;white-space:nowrap;font-size:12px;vertical-align:top"';
-  const thStyle = 'style="padding:5px 8px;border:1px solid #ccc;background:#f3f0ff;font-size:11px;font-weight:800;color:#613e98;cursor:pointer;white-space:nowrap;position:sticky;top:40px;z-index:1"';
+
+  // ── Build per-column filter cells (outer context, uses real data)
+  // ≤200 unique values → multi-select with checkboxes + search
+  // >200 unique values → text-search inside same dropdown shell
+  const MAX_CB = 200;
+  const filterCells = headers.map((h, i) => {
+    const uniq = [...new Set(rows.map(r => String(r[h]??'')))].sort((a,b) => {
+      const na=+a, nb=+b;
+      return (!isNaN(na)&&!isNaN(nb)) ? na-nb : a.localeCompare(b);
+    });
+
+    const hE = esc2(h);
+    const btn = `<button class="msBtn" onclick="tDD(this,${i})"><span class="msL" id="ml${i}">— All —</span><span class="msA">▾</span></button>`;
+
+    if (uniq.length > MAX_CB) {
+      // text-search only (high cardinality column)
+      return `<td class="fr-td" data-col="${i}" data-type="txt"><div class="msW">${btn}` +
+        `<div class="msDd" id="dd${i}">` +
+        `<input class="msSi txtF" type="text" data-col="${i}" placeholder="🔍 ${hE}…" oninput="doF();uLblT(this,${i})">` +
+        `<div class="ms-note">${uniq.length.toLocaleString()} unique values — type to search</div>` +
+        `</div></div></td>`;
+    }
+
+    // multi-select checkboxes
+    const opts = uniq.map(v =>
+      `<label class="msO"><input type="checkbox" value="${esc2(v)}" onchange="uLbl(this.closest('.msW'),${i});doF()"><span>${esc2(v===''?'(blank)':v)}</span></label>`
+    ).join('');
+    return `<td class="fr-td" data-col="${i}" data-type="sel"><div class="msW">${btn}` +
+      `<div class="msDd" id="dd${i}">` +
+      `<input class="msSi" type="text" placeholder="🔍 Search ${hE}…" oninput="fOpts(this)">` +
+      `<div class="msActs"><button onclick="aDD(this,${i})">✓ All</button><button onclick="cDD(this,${i})">× Clear</button></div>` +
+      `<div class="msOl">${opts}</div>` +
+      `</div></div></td>`;
+  }).join('');
+
+  const total  = rows.length;
+  const labelJ = JSON.stringify(label);
+
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc2(label)}</title>
 <style>
 *{box-sizing:border-box;font-family:system-ui,sans-serif}
 body{margin:0;padding:12px;background:#faf8ff}
-h2{font-size:14px;color:#613e98;margin:0 0 8px}
-.toolbar{display:flex;gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap}
-.toolbar input{padding:4px 8px;border:1.5px solid #c9b8f0;border-radius:5px;font-size:12px;outline:none}
-.toolbar input:focus{border-color:#613e98}
-.tbl-wrap{overflow:auto;max-height:calc(100vh - 100px);border-radius:8px;border:1px solid #ddd;box-shadow:0 2px 8px rgba(97,62,152,.1)}
+h2{font-size:14px;color:#613e98;margin:0 0 8px;font-weight:800}
+.bar{display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap}
+.gs{padding:5px 10px;border:1.5px solid #c9b8f0;border-radius:6px;font-size:12px;outline:none;min-width:200px;font-family:inherit}
+.gs:focus{border-color:#613e98}
+.btn{padding:5px 14px;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap}
+.bn{background:#3c2b60;color:#fff}.bn:hover{background:#251840}
+.bf{background:#613e98;color:#fff}.bf:hover{background:#3c2b60}
+.br{background:#ede8fc;color:#613e98;border:1.5px solid #c9b8f0}.br:hover{background:#d5c5f0}
+.cnt{font-size:11.5px;color:#7a5e99;font-weight:700;margin-left:auto}
+.tw{overflow:auto;max-height:calc(100vh - 114px);border-radius:8px;border:1px solid #d5c5f0;box-shadow:0 2px 8px rgba(97,62,152,.1)}
 table{border-collapse:collapse;width:max-content}
-thead tr:first-child th{position:sticky;top:0;z-index:2;background:#f3f0ff}
-.filter-row input{width:100%;padding:2px 5px;border:1px solid #ddd;font-size:11px;border-radius:3px;outline:none}
-.filter-row input:focus{border-color:#613e98}
-.count{font-size:11px;color:#888;margin-left:auto}
-</style></head><body>
-<h2>${esc2(label)} — ${rows.length.toLocaleString()} rows</h2>
-<div class="toolbar">
-  <input type="text" id="gsearch" placeholder="🔍 Search all columns…" oninput="filterRows()" style="min-width:220px">
-  <span class="count" id="cnt"></span>
+thead th{position:sticky;top:0;z-index:3;background:#f0ebff;padding:6px 8px;border:1px solid #c9b8f0;font-size:11px;font-weight:800;color:#613e98;cursor:pointer;white-space:nowrap;user-select:none}
+thead th:hover{background:#e4dbf8}
+.fr-td{position:sticky;top:31px;z-index:2;background:#f8f5ff;padding:3px 4px;border:1px solid #e0d5f5}
+/* multi-select widget */
+.msW{position:relative;display:inline-block;width:100%;min-width:80px;max-width:170px}
+.msBtn{display:flex;align-items:center;gap:3px;width:100%;padding:3px 7px;border:1px solid #c9b8f0;border-radius:5px;background:#fff;cursor:pointer;font-size:11px;font-family:inherit}
+.msBtn:hover{border-color:#613e98;background:#f5f0ff}
+.msL{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;text-align:left;color:#444;font-size:11px}
+.msA{font-size:9px;color:#9b7fcc;flex-shrink:0}
+.msDd{display:none;position:fixed;z-index:9999;background:#fff;border:1.5px solid #c9b8f0;border-radius:9px;box-shadow:0 8px 30px rgba(0,0,0,.2);min-width:210px;max-width:300px;overflow:hidden;flex-direction:column}
+.msDd.open{display:flex}
+.msSi{padding:8px 10px;border:none;border-bottom:1.5px solid #e0d5f5;font-size:12px;outline:none;font-family:inherit;background:#fdfbff;width:100%;flex-shrink:0}
+.msSi:focus{background:#f0ebff}
+.msActs{display:flex;gap:5px;padding:5px 8px;border-bottom:1px solid #ede8f5;flex-shrink:0}
+.msActs button{flex:1;padding:3px 8px;border:1px solid #c9b8f0;border-radius:4px;background:#f0ebff;color:#613e98;cursor:pointer;font-size:10.5px;font-weight:700;font-family:inherit}
+.msActs button:hover{background:#d5c5f0}
+.ms-note{padding:7px 10px;font-size:11px;color:#9b7fcc;font-style:italic;flex-shrink:0}
+.msOl{overflow-y:auto;max-height:240px;padding:4px}
+.msO{display:flex;align-items:center;gap:7px;padding:5px 8px;cursor:pointer;border-radius:5px;font-size:11.5px}
+.msO:hover{background:#f0ebff}
+.msO.hid{display:none}
+.msO input[type=checkbox]{accent-color:#613e98;width:14px;height:14px;flex-shrink:0;cursor:pointer}
+.msO span{line-height:1.3;word-break:break-word}
+tbody td{padding:4px 8px;border:1px solid #ede8f5;white-space:nowrap;font-size:12px;vertical-align:top}
+tbody tr:hover td{background:#f0eaff}
+tbody tr:nth-child(even) td{background:#fdfbff}
+</style>
+</head><body>
+<h2>${esc2(label)} &mdash; <span id="vc">${total.toLocaleString()}</span>&nbsp;of&nbsp;${total.toLocaleString()}&nbsp;rows</h2>
+<div class="bar">
+  <input class="gs" type="text" id="gs" placeholder="&#128269; Search all columns…" oninput="doF()">
+  <button class="btn bn" onclick="dlAll()" title="Download every row (ignores filters)">&#128229; All Data</button>
+  <button class="btn bf" onclick="dlFlt()" title="Download only the rows visible after filtering">&#128229; Filtered Data</button>
+  <button class="btn br" onclick="rstF()">&#8635; Reset</button>
+  <span class="cnt" id="cnt"></span>
 </div>
-<div class="tbl-wrap">
+<div class="tw">
 <table id="dt">
 <thead>
-<tr>${headers.map(h=>`<th ${thStyle} onclick="sortCol(this,'${esc2(h)}')" title="Sort by ${esc2(h)}">${esc2(h)} <span class="sort-ind"></span></th>`).join('')}</tr>
-<tr class="filter-row">${headers.map((_,i)=>`<td style="padding:3px 4px;border:1px solid #ddd;background:#faf8ff;position:sticky;top:40px"><input data-col="${i}" oninput="filterRows()" placeholder="filter…"></td>`).join('')}</tr>
+<tr id="hr">${headers.map((h,i)=>`<th onclick="srt(${i})">${esc2(h)}&nbsp;<span id="si${i}" style="font-size:9px;color:#9b7fcc"></span></th>`).join('')}</tr>
+<tr id="fr">${filterCells}</tr>
 </thead>
-<tbody id="tbody">${rows.map(r=>`<tr>${headers.map(h=>`<td ${tdStyle}>${esc2(r[h])}</td>`).join('')}</tr>`).join('')}</tbody>
+<tbody id="tb"></tbody>
 </table>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"><\/script>
 <script>
-const allRows=${JSON.stringify(rows.map(r=>headers.map(h=>String(r[h]??''))))};
-let sortState={col:-1,asc:true};
-function getFiltered(){
-  const g=document.getElementById('gsearch').value.toLowerCase().trim();
-  const colFilters=Array.from(document.querySelectorAll('.filter-row input')).map(i=>i.value.toLowerCase().trim());
-  return allRows.filter(row=>{
-    if(g&&!row.some(c=>c.toLowerCase().includes(g))) return false;
-    for(let i=0;i<colFilters.length;i++){if(colFilters[i]&&!row[i].toLowerCase().includes(colFilters[i])) return false;}
+const H=${JSON.stringify(headers)};
+const A=${JSON.stringify(rows.map(r=>headers.map(h=>String(r[h]??''))))};
+let sc=-1,sa=true;
+
+/* ── filter ── */
+function gF(){
+  const g=document.getElementById('gs').value.toLowerCase();
+  const cells=Array.from(document.querySelectorAll('.fr-td'));
+  return A.filter(row=>{
+    if(g&&!row.some(c=>c.toLowerCase().includes(g)))return false;
+    for(const td of cells){
+      const i=parseInt(td.dataset.col);
+      if(td.dataset.type==='txt'){
+        const v=(td.querySelector('.txtF')||{value:''}).value.toLowerCase().trim();
+        if(v&&!row[i].toLowerCase().includes(v))return false;
+      }else{
+        const cbs=[...td.querySelectorAll('.msO input:checked')];
+        const tot=td.querySelectorAll('.msO input').length;
+        if(cbs.length>0&&cbs.length<tot&&!new Set(cbs.map(c=>c.value)).has(row[i]))return false;
+      }
+    }
     return true;
   });
 }
-function renderBody(rows){
-  document.getElementById('tbody').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td ${tdStyle}>'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td>').join('')+'</tr>').join('');
-  document.getElementById('cnt').textContent=rows.length.toLocaleString()+' of ${rows.length.toLocaleString()} rows';
+function gS(rows){
+  if(sc<0)return rows;
+  const c=sc,a=sa;
+  return[...rows].sort((x,y)=>a?x[c].localeCompare(y[c],undefined,{numeric:true}):y[c].localeCompare(x[c],undefined,{numeric:true}));
 }
-function filterRows(){
-  const f=getFiltered();
-  if(sortState.col>=0){
-    const sc=sortState.col,asc=sortState.asc;
-    f.sort((a,b)=>asc?a[sc].localeCompare(b[sc],undefined,{numeric:true}):b[sc].localeCompare(a[sc],undefined,{numeric:true}));
+function rB(rows){
+  document.getElementById('tb').innerHTML=rows.map(r=>'<tr>'+r.map(c=>'<td>'+c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</td>').join('')+'</tr>').join('');
+  document.getElementById('vc').textContent=rows.length.toLocaleString();
+}
+function doF(){rB(gS(gF()));}
+function srt(i){
+  if(sc===i)sa=!sa;else{sc=i;sa=true;}
+  H.forEach((_,j)=>{const s=document.getElementById('si'+j);if(s)s.textContent=j===i?(sa?'▲':'▼'):'';});
+  doF();
+}
+
+/* ── multi-select dropdown ── */
+function tDD(btn,i){
+  const dd=document.getElementById('dd'+i);
+  const wasOpen=dd.classList.contains('open');
+  closeAll();
+  if(!wasOpen){
+    const r=btn.getBoundingClientRect();
+    dd.style.top=(r.bottom+3)+'px';
+    dd.style.left=r.left+'px';
+    dd.classList.add('open');
+    btn.querySelector('.msA').textContent='▴';
+    const dr=dd.getBoundingClientRect();
+    if(dr.right>window.innerWidth-6)dd.style.left=(window.innerWidth-dr.width-6)+'px';
+    if(dr.bottom>window.innerHeight-6)dd.style.top=(r.top-dr.height-3)+'px';
+    const si=dd.querySelector('.msSi');
+    if(si){si.focus();if(si.classList.contains('txtF'))si.select();}
   }
-  renderBody(f);
 }
-function sortCol(th,_col){
-  const idx=Array.from(th.parentNode.children).indexOf(th);
-  if(sortState.col===idx)sortState.asc=!sortState.asc;
-  else{sortState.col=idx;sortState.asc=true;}
-  document.querySelectorAll('thead tr:first-child th .sort-ind').forEach((s,i)=>s.textContent=i===idx?(sortState.asc?' ▲':' ▼'):'');
-  filterRows();
+function closeAll(){
+  document.querySelectorAll('.msDd.open').forEach(d=>{
+    d.classList.remove('open');
+    const b=d.previousElementSibling;
+    if(b)b.querySelector('.msA').textContent='▾';
+    /* reset internal checkbox-search when closing (keep txtF values) */
+    const si=d.querySelector('.msSi:not(.txtF)');
+    if(si){si.value='';d.querySelectorAll('.msO').forEach(o=>o.classList.remove('hid'));}
+  });
 }
-filterRows();
+document.addEventListener('click',e=>{if(!e.target.closest('.msW'))closeAll();});
+
+function fOpts(inp){
+  const q=inp.value.toLowerCase().trim();
+  inp.closest('.msDd').querySelectorAll('.msO').forEach(o=>{
+    o.classList.toggle('hid',!!(q&&!o.querySelector('span').textContent.toLowerCase().includes(q)));
+  });
+}
+function aDD(btn,i){
+  btn.closest('.msDd').querySelectorAll('.msO:not(.hid) input').forEach(c=>c.checked=true);
+  uLbl(btn.closest('.msW'),i);doF();
+}
+function cDD(btn,i){
+  btn.closest('.msDd').querySelectorAll('.msO input').forEach(c=>c.checked=false);
+  uLbl(btn.closest('.msW'),i);doF();
+}
+function uLbl(w,i){
+  const chk=[...w.querySelectorAll('.msO input:checked')];
+  const tot=w.querySelectorAll('.msO input').length;
+  const lbl=document.getElementById('ml'+i);
+  if(!lbl)return;
+  if(!chk.length||chk.length===tot){lbl.textContent='— All —';lbl.style.color='';lbl.style.fontWeight='';}
+  else if(chk.length===1){lbl.textContent=chk[0].value||'(blank)';lbl.style.color='#613e98';lbl.style.fontWeight='700';}
+  else{lbl.textContent=chk.length+' selected';lbl.style.color='#613e98';lbl.style.fontWeight='700';}
+}
+function uLblT(inp,i){
+  const lbl=document.getElementById('ml'+i);if(!lbl)return;
+  const v=inp.value.trim();
+  if(!v){lbl.textContent='Search…';lbl.style.color='';lbl.style.fontWeight='';}
+  else{lbl.textContent='"'+(v.length>14?v.slice(0,14)+'…':v)+'"';lbl.style.color='#613e98';lbl.style.fontWeight='700';}
+}
+function rstF(){
+  document.getElementById('gs').value='';
+  document.querySelectorAll('.fr-td').forEach(td=>{
+    if(td.dataset.type==='txt'){
+      const inp=td.querySelector('.txtF');if(inp)inp.value='';
+      const lbl=document.getElementById('ml'+td.dataset.col);
+      if(lbl){lbl.textContent='Search…';lbl.style.color='';lbl.style.fontWeight='';}
+    }else{
+      td.querySelectorAll('.msO input').forEach(c=>c.checked=false);
+      td.querySelectorAll('.msO').forEach(o=>o.classList.remove('hid'));
+      const si=td.querySelector('.msSi');if(si)si.value='';
+      uLbl(td.querySelector('.msW'),td.dataset.col);
+    }
+  });
+  sc=-1;sa=true;
+  H.forEach((_,j)=>{const s=document.getElementById('si'+j);if(s)s.textContent='';});
+  doF();
+}
+
+/* ── download ── */
+function dlXL(data,fname){
+  if(typeof XLSX!=='undefined'){
+    const wb=XLSX.utils.book_new(),ws=XLSX.utils.aoa_to_sheet([H,...data]);
+    XLSX.utils.book_append_sheet(wb,ws,'Data');XLSX.writeFile(wb,fname);
+  }else{
+    const csv=[H,...data].map(r=>r.map(c=>'"'+c.replace(/"/g,'""')+'"').join(',')).join('\\n');
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(new Blob(['\\uFEFF'+csv],{type:'text/csv;charset=utf-8'}));
+    a.download=fname.replace(/\\.xlsx$/,'.csv');a.click();
+  }
+}
+function dlAll(){dlXL(A,${labelJ}+'.xlsx');}
+function dlFlt(){
+  const data=gS(gF());
+  if(!data.length){alert('No rows match current filters.');return;}
+  dlXL(data,${labelJ}+' (filtered).xlsx');
+}
+
+/* ── init ── */
+window.addEventListener('load',()=>{
+  const hr=document.getElementById('hr');
+  if(hr){const t=Math.round(hr.getBoundingClientRect().height);document.querySelectorAll('.fr-td').forEach(td=>td.style.top=t+'px');}
+});
+doF();
 <\/script></body></html>`;
   const win = window.open('', '_blank');
   if (win) { win.document.write(html); win.document.close(); }
